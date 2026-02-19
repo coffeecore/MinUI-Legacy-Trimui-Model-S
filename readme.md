@@ -29,6 +29,33 @@ I'd love for you to add the custom in-game menu to your emulator. It can be done
 
 ## Documentation
 
+## Supported systems
+
+| System | Emulator | Picoarch | Comment
+| --- | --- | --- | --- |
+| Arcade |  | mame2000 / fbalpha2012 |  |
+| Atari Lynx | handy-rs97 |  |  |
+| MSX |  | bluemsx / fmsx |  |
+| NEC TurboGrafx-16 | temper | bettle-pce-fast |  |
+| NEC TurboGrafx-CD | temper | bettle-pce-fast |  |
+| Nintendo Entertainment System | fceux | fceumm / quicknes |  |
+| Nintendo Game Boy | gambatte-dms | gambatte |  |
+| Nintendo Game Boy Advance | picogpsp | gpsp |  |
+| Nintendo Game Boy Color | gambatte-dms | gambatte |  |
+| Nintendo Super Nintendo Entertainment System | snes9x2002 | snes9x2002 |  |
+| Pokemon Mini | pokemini |  |  |
+| Sega 32X | picodrive |  |  |
+| Sega CD | picodrive |  |  |
+| Sega Game Gear | sms_sdl | smsplus-gx |  |
+| Sega Genesis | picodrive |  |  |
+| Sega Master System | sms_sdl | smsplus-gx |  |
+| SNK Neo Geo Pocket | race-od |  |  |
+| SNK Neo Geo Pocket Color | race-od |  |  |
+| Sony Playstation | pcsx_rearmed |  |  |
+| WonderSwan | oswan |  |  |
+| WonderSwan Color | oswan | bettle-pce-fast |  |
+
+
 ### Disabled a folder
 
 You can hide ROM folders, just add `.disabled` in its name at the end.
