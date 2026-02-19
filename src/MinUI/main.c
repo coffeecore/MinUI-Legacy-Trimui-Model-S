@@ -106,6 +106,8 @@ static void get_file(char* path, char* buffer) {
 static int hide(char* name) {
 	if (name[0]=='.') return 1;
 	
+        if (match_suffix(".disabled", name)) return 1;
+
 	// TODO: these might not be necessary? unless a user just renames their stock folders...
 	if (match_suffix("_cache.db", name)) return 1;
 	if (match_prefix("COPYING", name)) return 1;
