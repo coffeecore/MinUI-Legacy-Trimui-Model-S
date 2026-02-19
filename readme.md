@@ -20,3 +20,15 @@ Non-emulator programs live in Tools. Native games live in Games.
 ## For developers
 
 I'd love for you to add the custom in-game menu to your emulator. It can be done in a way that allows the same binary run on non-MinUI devices too. Check out my [libmmenu repo](https://github.com/shauninman/libmmenu) for simple implementation details.
+
+## Todo
+
+- Add Collections
+- Add map system
+- Prepare relase with separate zip : Base, Emulators, Tools. Emulators standalone and picoarch
+
+## Documentation
+
+### Disabled a folder
+
+You can hide ROM folders, just add `.disabled` in its name at the end.
