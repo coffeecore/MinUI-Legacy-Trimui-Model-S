@@ -52,3 +52,21 @@
 [submodule "third-party/Trimui-Model-S-picoarch"]
 	path = third-party/Trimui-Model-S-picoarch
 	url = https://github.com/coffeecore/Trimui-Model-S-picoarch
+[submodule "third-party/speccy"]
+	path = third-party/speccy
+	url = https://github.com/liartes/speccy
+	branch = trimui-model-s
+[submodule "third-party/retro8"]
+	path = third-party/retro8
+	url = https://github.com/liartes/retro8
+	branch = trimui-model-s
+[submodule "third-party/gngeo"]
+	path = third-party/gngeo
+	url = https://github.com/liartes/gngeo
+[submodule "third-party/Stella-3.9.3"]
+	path = third-party/Stella-3.9.3
+	url = https://github.com/liartes/Stella-3.9.3
+[submodule "third-party/arnold_gcw0"]
+	path = third-party/arnold_gcw0
+	url = https://github.com/liartes/arnold_gcw0
+	branch = trimui-powkiddy-a66
