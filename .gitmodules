@@ -49,3 +49,6 @@
 [submodule "src/libmsettings"]
 	path = src/libmsettings
 	url = git@github.com:shauninman/libmsettings.git
+[submodule "third-party/Trimui-Model-S-picoarch"]
+	path = third-party/Trimui-Model-S-picoarch
+	url = https://github.com/coffeecore/Trimui-Model-S-picoarch
