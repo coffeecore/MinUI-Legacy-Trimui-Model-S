@@ -16,8 +16,8 @@ all: readme sys emus tools zip
 #--------------------------------------
 
 lib:
-	cd ./src/libmsettings && make
-	cd ./src/libmmenu && make
+	cd ./src/libmsettings && make CROSS_COMPILE=/opt/trimui-toolchain/usr/bin/arm-buildroot-linux-gnueabi- PREFIX=/opt/trimui-toolchain/usr/arm-buildroot-linux-gnueabi/sysroot/usr
+	cd ./src/libmmenu && make CROSS_COMPILE=/opt/trimui-toolchain/usr/bin/arm-buildroot-linux-gnueabi- PREFIX=/opt/trimui-toolchain/usr/arm-buildroot-linux-gnueabi/sysroot/usr
 
 readme:
 	mkdir -p "$(BUILD_PATH)"
@@ -52,10 +52,10 @@ sys: lib
 	cp "third-party/SDL-1.2/build/.libs/libSDL-1.2.so.0.11.5" "$(PAYLOAD_PATH)/System/lib/libSDL-1.2.so.0"
 
 #--------------------------------------
-emus: gb pm ngp gg snes ps gba nes gen pce swan lynx
+emus: gb pm ngp gg snes ps gba nes gen pce swan lynx arnold
 #--------------------------------------
 
-emu:
+emu: lib
 	mkdir -p "$(PAYLOAD_PATH)/Emus"
 
 gb: emu
@@ -144,6 +144,12 @@ lynx: emu
 	cd ./third-party/handy-rs97 && make -j
 	cp -R "paks/Lynx.pak" "$(PAYLOAD_PATH)/Emus"
 	cp "third-party/handy-rs97/handy" "$(PAYLOAD_PATH)/Emus/Lynx.pak"
+
+arnold: emu
+	mkdir -p "$(ROMS_PATH)/GX4000/.GX4000/saves"
+	cd ./third-party/arnold_gcw0 && make -j CROSS_COMPILE=/opt/trimui-toolchain/usr/bin/arm-buildroot-linux-gnueabi- PREFIX=/opt/trimui-toolchain/usr/arm-buildroot-linux-gnueabi/sysroot/usr CC=/opt/trimui-toolchain/usr/bin/arm-buildroot-linux-gnueabi-gcc
+	cp -R "./third-party/arnold_gcw0/GX4000.pak" "$(PAYLOAD_PATH)/Emus"
+	cp ./third-party/arnold_gcw0/arnold "$(PAYLOAD_PATH)/Emus/GX4000.pak"
 
 #--------------------------------------
 tools: bridge commander reload stock tips # zero
