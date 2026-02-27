@@ -52,7 +52,7 @@ sys: lib
 	cp "third-party/SDL-1.2/build/.libs/libSDL-1.2.so.0.11.5" "$(PAYLOAD_PATH)/System/lib/libSDL-1.2.so.0"
 
 #--------------------------------------
-emus: gb pm ngp gg snes ps gba nes gen pce swan lynx arnold stella retro8 gngeo
+emus: gb pm ngp gg snes ps gba nes gen pce swan lynx arnold stella retro8 gngeo picoarch
 #--------------------------------------
 
 emu: lib
@@ -187,6 +187,13 @@ gngeo: emu
 	cp -R "paks/NEOGEO.pak" "$(PAYLOAD_PATH)/Emus"
 	cp ./third-party/gngeo/src/dist/usr/local/bin/gngeo "$(PAYLOAD_PATH)/Emus/NEOGEO-8.pak"
 	cp ./third-party/gngeo/dist/usr/local/share/gngeo/gngeo_data.zip "$(PAYLOAD_PATH)/Emus/NEOGEO.pak"
+
+picoarch: emu
+# 	mkdir -p "$(ROMS_PATH)/NEOGEO"
+# 	cd ./third-party/picoarch && grep -Rl "/opt/trimui-toolchain/" . | xargs sed -i 's|/opt/trimui-toolchain/|/opt/trimui-toolchain/usr/|g'
+# 	cd ./third-party/picoarch && ./configure --host=arm --with-sdl-prefix=/opt/trimui-toolchain/usr/arm-buildroot-linux-gnueabi/sysroot/usr CFLAGS="-I/opt/trimui-toolchain/usr/arm-buildroot-linux-gnueabi/sysroot/usr/include -ldl" CC=/opt/trimui-toolchain/usr/bin/arm-buildroot-linux-gnueabi-gcc
+	cd ./third-party/picoarch && make clean && make platform=trimui CROSS_COMPILE=/opt/trimui-toolchain/usr/bin/arm-buildroot-linux-gnueabi- PREFIX=/opt/trimui-toolchain/usr/arm-buildroot-linux-gnueabi/sysroot/usr CC=/opt/trimui-toolchain/usr/bin/arm-buildroot-linux-gnueabi-gcc CXX=/opt/trimui-toolchain/usr/bin/arm-buildroot-linux-gnueabi-g++ LD=/opt/trimui-toolchain/usr/bin/arm-buildroot-linux-gnueabi-g++
+# 	cd ./third-party/picoarch && grep -Rl "/opt/trimui-toolchain/usr/" . | xargs sed -i 's|/opt/trimui-toolchain/usr/|/opt/trimui-toolchain/|g'
 
 #--------------------------------------
 tools: bridge commander reload stock tips # zero
