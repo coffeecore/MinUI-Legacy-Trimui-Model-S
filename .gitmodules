@@ -49,9 +49,6 @@
 [submodule "src/libmsettings"]
 	path = src/libmsettings
 	url = git@github.com:shauninman/libmsettings.git
-[submodule "third-party/picoarch"]
-	path = third-party/picoarch
-	url = https://github.com/coffeecore/picoarch
 [submodule "third-party/arnold_gcw0"]
 	path = third-party/arnold_gcw0
 	url = https://github.com/liartes/arnold_gcw0
