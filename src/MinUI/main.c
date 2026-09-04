@@ -1284,56 +1284,58 @@ int main(void) {
 		
 		int selected = top->selected;
 		int total = top->entries->count;
-		if (Input_justRepeated(kButtonUp)) {
-			selected -= 1;
-			if (selected<0) {
-				selected = total-1;
-				int start = total - kMaxRows;
-				top->start = (start<0) ? 0 : start;
-				top->end = total;
+		if (!Input_isPressed(kButtonSelect)) {
+			if (Input_justRepeated(kButtonUp)) {
+				selected -= 1;
+				if (selected<0) {
+					selected = total-1;
+					int start = total - kMaxRows;
+					top->start = (start<0) ? 0 : start;
+					top->end = total;
+				}
+				else if (selected<top->start) {
+					top->start -= 1;
+					top->end -= 1;
+				}
 			}
-			else if (selected<top->start) {
-				top->start -= 1;
-				top->end -= 1;
+			else if (Input_justRepeated(kButtonDown)) {
+				selected += 1;
+				if (selected>=total) {
+					selected = 0;
+					top->start = 0;
+					top->end = (total<kMaxRows) ? total : kMaxRows;
+				}
+				else if (selected>=top->end) {
+					top->start += 1;
+					top->end += 1;
+				}
 			}
-		}
-		else if (Input_justRepeated(kButtonDown)) {
-			selected += 1;
-			if (selected>=total) {
-				selected = 0;
-				top->start = 0;
-				top->end = (total<kMaxRows) ? total : kMaxRows;
+			if (Input_justRepeated(kButtonLeft)) {
+				selected -= kMaxRows;
+				if (selected<0) {
+					selected = 0;
+					top->start = 0;
+					top->end = (total<kMaxRows) ? total : kMaxRows;
+				}
+				else if (selected<top->start) {
+					top->start -= kMaxRows;
+					if (top->start<0) top->start = 0;
+					top->end = top->start + kMaxRows;
+				}
 			}
-			else if (selected>=top->end) {
-				top->start += 1;
-				top->end += 1;
-			}
-		}
-		if (Input_justRepeated(kButtonLeft)) {
-			selected -= kMaxRows;
-			if (selected<0) {
-				selected = 0;
-				top->start = 0;
-				top->end = (total<kMaxRows) ? total : kMaxRows;
-			}
-			else if (selected<top->start) {
-				top->start -= kMaxRows;
-				if (top->start<0) top->start = 0;
-				top->end = top->start + kMaxRows;
-			}
-		}
-		else if (Input_justRepeated(kButtonRight)) {
-			selected += kMaxRows;
-			if (selected>=total) {
-				selected = total-1;
-				int start = total - kMaxRows;
-				top->start = (start<0) ? 0 : start;
-				top->end = total;
-			}
-			else if (selected>=top->end) {
-				top->end += kMaxRows;
-				if (top->end>total) top->end = total;
-				top->start = top->end - kMaxRows;
+			else if (Input_justRepeated(kButtonRight)) {
+				selected += kMaxRows;
+				if (selected>=total) {
+					selected = total-1;
+					int start = total - kMaxRows;
+					top->start = (start<0) ? 0 : start;
+					top->end = total;
+				}
+				else if (selected>=top->end) {
+					top->end += kMaxRows;
+					if (top->end>total) top->end = total;
+					top->start = top->end - kMaxRows;
+				}
 			}
 		}
 		if (!Input_isPressed(kButtonStart) && !Input_isPressed(kButtonSelect)) {
@@ -1421,21 +1423,25 @@ int main(void) {
 		
 		int old_setting = show_setting;
 		int old_value = setting_value;
-		show_setting = 0;
-		if (Input_isPressed(kButtonStart) && Input_isPressed(kButtonSelect)) {
-			// buh
-		}
-		else if (Input_isPressed(kButtonStart)) {
+
+		if (!Input_isPressed(kButtonSelect)) {
+			show_setting = 0;
+		} else if (Input_isPressed(kButtonLeft) || Input_isPressed(kButtonRight)) {
 			show_setting = 1;
 			setting_value = GetBrightness();
 			setting_max = 10;
 			// printf("show brightness: %i\n", setting_value, setting_max);
 		}
-		else if (Input_isPressed(kButtonSelect)) {
+		else if (Input_isPressed(kButtonUp) || Input_isPressed(kButtonDown)) {
 			show_setting = 2;
 			setting_value = GetVolume();
 			setting_max = 20;
 			// printf("show volume: %i\n", setting_value, setting_max);
+		} else if (show_setting == 1) {
+				setting_value = GetBrightness();
+		}
+		else if (show_setting == 2) {
+				setting_value = GetVolume();
 		}
 		if (old_setting!=show_setting || old_value!=setting_value) is_dirty = 1;
 		

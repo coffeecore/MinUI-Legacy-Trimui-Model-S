@@ -19,6 +19,11 @@
 #define	BUTTON_L	KEY_TAB
 #define	BUTTON_R	KEY_BACKSPACE
 
+#define BUTTON_UP KEY_UP
+#define BUTTON_DOWN KEY_DOWN
+#define BUTTON_LEFT KEY_LEFT
+#define BUTTON_RIGHT KEY_RIGHT
+
 //	for keyshm
 #define VOLUME		0
 #define BRIGHTNESS	1
@@ -146,6 +151,7 @@ void main(void) {
 	register uint32_t button_flag = 0;
 	uint32_t repeat_START = 0; //	for suspend
 	uint32_t repeat_LR = 0;
+	uint32_t repeat_DPAD = 0;
 	while( read(input_fd, &ev, sizeof(ev)) == sizeof(ev) ) {
 		val = ev.value;
 		if (( ev.type != EV_KEY ) || ( val > REPEAT )) continue;
@@ -165,6 +171,90 @@ void main(void) {
 				repeat_START = (pressedbuttons == 1 ? val : 0);
 			} 
 			break;
+		case BUTTON_UP:
+			if ( val == REPEAT ) {
+				// Adjust repeat speed to 1/2
+				val = repeat_DPAD;
+				repeat_DPAD ^= PRESSED;
+			} else {
+				repeat_DPAD = 0;
+			}
+			if ( val == PRESSED ) {
+				switch (button_flag) {
+				case SELECT:
+					// SELECT + UP : volume up
+					val = GetVolume();
+					if (val<VOLMAX) SetVolume(++val);
+
+					break;
+				default:
+					break;
+				}
+			}
+			break;
+		case BUTTON_DOWN:
+			if ( val == REPEAT ) {
+				// Adjust repeat speed to 1/2
+				val = repeat_DPAD;
+				repeat_DPAD ^= PRESSED;
+			} else {
+				repeat_DPAD = 0;
+			}
+			if ( val == PRESSED ) {
+				switch (button_flag) {
+				case SELECT:
+					// SELECT + DOWN : volume down
+					val = GetVolume();
+					if (val>0) SetVolume(--val);
+
+					break;
+				default:
+					break;
+				}
+			}
+			break;
+		case BUTTON_LEFT:
+			if ( val == REPEAT ) {
+				// Adjust repeat speed to 1/2
+				val = repeat_DPAD;
+				repeat_DPAD ^= PRESSED;
+			} else {
+				repeat_DPAD = 0;
+			}
+			if ( val == PRESSED ) {
+				switch (button_flag) {
+				case SELECT:
+					// SELECT + LEFT : brightness down
+					val = GetBrightness();
+					if (val>0) SetBrightness(--val);
+
+					break;
+				default:
+					break;
+				}
+			}
+			break;
+		case BUTTON_RIGHT:
+			if ( val == REPEAT ) {
+				// Adjust repeat speed to 1/2
+				val = repeat_DPAD;
+				repeat_DPAD ^= PRESSED;
+			} else {
+				repeat_DPAD = 0;
+			}
+			if ( val == PRESSED ) {
+				switch (button_flag) {
+				case SELECT:
+					// SELECT + RIGHT : brightness up
+					val = GetBrightness();
+					if (val<BRIMAX) SetBrightness(++val);
+
+					break;
+				default:
+					break;
+				}
+			}
+			break;
 		case BUTTON_L:
 			if ( val == REPEAT ) {
 				// Adjust repeat speed to 1/2
@@ -177,13 +267,13 @@ void main(void) {
 				switch (button_flag) {
 				case SELECT:
 					// SELECT + L : volume down
-					val = GetVolume();
-					if (val>0) SetVolume(--val);
+					// val = GetVolume();
+					// if (val>0) SetVolume(--val);
 					break;
 				case START:
 					// START + L : brightness down
-					val = GetBrightness();
-					if (val>0) SetBrightness(--val);
+					// val = GetBrightness();
+					// if (val>0) SetBrightness(--val);
 					break;
 				default:
 					break;
@@ -202,13 +292,13 @@ void main(void) {
 				switch (button_flag) {
 				case SELECT:
 					// SELECT + R : volume up
-					val = GetVolume();
-					if (val<VOLMAX) SetVolume(++val);
+					// val = GetVolume();
+					// if (val<VOLMAX) SetVolume(++val);
 					break;
 				case START:
 					// START + R : brightness up
-					val = GetBrightness();
-					if (val<BRIMAX) SetBrightness(++val);
+					// val = GetBrightness();
+					// if (val<BRIMAX) SetBrightness(++val);
 					break;
 				default:
 					break;
