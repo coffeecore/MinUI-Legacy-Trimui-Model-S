@@ -30,6 +30,7 @@
 #define kTrimuiUpdatePath kRootDir "/TrimuiUpdate_MinUI.zip"
 #define kScreenshotsPath kRootDir "/.minui/screenshots.txt"
 #define kScreenshotPathTemplate kRootDir "/.minui/screenshots/screenshot-%03i.bmp"
+#define kPreferPicoarchPath kRootDir "/.minui/prefer-picoarch"
 
 ///////////////////////////////////////
 
@@ -256,6 +257,8 @@ static int exists(char* path) {
 	return access(path, F_OK)==0;
 }
 
+
+
 static void StringArray_free(Array* self) {
 	for (int i=0; i<self->count; i++) {
 		free(self->items[i]);
@@ -390,30 +393,97 @@ static int hasPaks(char* path) {
 	}
 	return has;
 }
+
 static int hasRoms(char* path) {
 	int has = 0;
-	
-	// makes sure we have an emu pak
-	char emu[256];
-	strcpy(emu, path);
-	strncpy(emu, kEmusDir, strlen(kEmusDir));
-	concat(emu, ".pak/launch.sh", 256);
-	if (!exists(emu)) return has;
-	
-	// now look for at least one rom
+
+
+	// Extract the system name from the ROM directory.
+	//
+	// path:
+	//   "/mnt/SDCARD/Roms/Game Boy"
+	//
+	// kRomsDir:
+	//   "/mnt/SDCARD/Roms/"
+	//
+	// system:
+	//   "Game Boy"
+	//
+	// Unlike open_rom(), path already stops at the system directory,
+	// so there is no "/Tetris.gb" part to remove.
+	char* system = path + strlen(kRomsDir);
+
+
+	// Build the standard MinUI launcher path.
+	//
+	// system:
+	//   "Game Boy"
+	//
+	// minui_launch:
+	//   "/mnt/SDCARD/Emus/Game Boy.pak/launch.sh"
+	char minui_launch[256];
+	snprintf(
+		minui_launch,
+		sizeof(minui_launch),
+		"%s%s.pak/launch.sh",
+		kEmusDir,
+		system
+	);
+
+
+	// Build the PicoArch launcher path using the same naming convention.
+	//
+	// system:
+	//   "Game Boy"
+	//
+	// picoarch_launch:
+	//   "/mnt/SDCARD/Emus/Game Boy-picoarch.pak/launch.sh"
+	char picoarch_launch[256];
+	snprintf(
+		picoarch_launch,
+		sizeof(picoarch_launch),
+		"%s%s-picoarch.pak/launch.sh",
+		kEmusDir,
+		system
+	);
+
+
+	// A ROM directory should only be shown if at least one emulator
+	// is actually able to launch it.
+	//
+	// MinUI only      -> show
+	// PicoArch only   -> show
+	// both            -> show
+	// neither         -> hide
+	int has_minui = exists(minui_launch);
+	int has_picoarch = exists(picoarch_launch);
+
+	if (!has_minui && !has_picoarch) return 0;
+
+
+	// Now make sure the directory contains at least one visible entry.
 	DIR *dh = opendir(path);
+
 	if (dh!=NULL) {
 		struct dirent *dp;
+
 		while((dp = readdir(dh)) != NULL) {
 			if (hide(dp->d_name)) continue;
+
+			// Hidden entries such as ".picoarch-..." do not count.
+			//
+			// Any other file/directory counts exactly as before.
 			// if (dp->d_type==DT_DIR) continue;
 			has = 1;
 			break;
 		}
+
 		closedir(dh);
 	}
+
 	return has;
 }
+
 static int hasUpdate(void) {
 	int has = 0;
 	if (exists(kTrimuiUpdatePath)) {
@@ -739,6 +809,9 @@ int quit = 0;
 
 Array* stack;
 Directory* top;
+
+static int prefer_picoarch = 0;
+
 #define kMaxRows 5
 
 ///////////////////////////////////////
@@ -918,51 +991,211 @@ static int has_cue(char* path, char* auto_path) {
 
 static int can_resume = 0;
 static int should_resume = 0; // set to 1 on TRIMUI_START but only if can_resume==1
+// Path to libmmenu's last-used save slot metadata for the selected ROM.
+//
+// Example:
+//   ROM:
+//     /mnt/SDCARD/Roms/Game Boy/Tetris.gb
+//
+//   slot_path:
+//     /mnt/SDCARD/Roms/Game Boy/.mmenu/Tetris.txt
+//
+// This metadata is shared by every emulator using libmmenu,
+// including MinUI emulators and PicoArch.
 static char slot_path[256];
 
 static void ready_resume(Entry* entry) {
 	can_resume = 0;
+
 	char path[256];
 	strcpy(path, entry->path);
+
+	// Resume only applies to ROM entries.
 	if (!match_prefix(kRomsDir, path)) return;
-	
+
+
+	// A directory can represent a single-disc game when it contains
+	// an automatically detected .cue file.
+	//
+	// Example:
+	//   entry:
+	//     /mnt/SDCARD/Roms/PlayStation/Ridge Racer
+	//
+	// path becomes:
+	//     /mnt/SDCARD/Roms/PlayStation/Ridge Racer/Ridge Racer.cue
 	char auto_path[256];
+
 	if (entry->type==kEntryDir) {
 		if (!has_cue(path, auto_path)) return;
 		strcpy(path, auto_path);
 	}
-	
+
+
+	// Extract the system name.
+	//
+	// path:
+	//   /mnt/SDCARD/Roms/Game Boy/Tetris.gb
+	//
+	// after removing kRomsDir:
+	//   Game Boy/Tetris.gb
+	//
+	// emu_name:
+	//   Game Boy
 	char emu_name[256];
 	strcpy(emu_name, path + strlen(kRomsDir));
+
 	char* slash = strchr(emu_name, '/');
 	emu_name[slash-emu_name] = '\0';
-	
+
+
+	// Extract the ROM filename.
+	//
+	// path:
+	//   /mnt/SDCARD/Roms/Game Boy/Tetris.gb
+	//
+	// rom_file:
+	//   Tetris.gb
 	char* tmp;
 	char rom_file[256];
+
 	tmp = strrchr(path, '/') + 1;
 	strcpy(rom_file, tmp);
-	
+
+
+	// Build libmmenu's metadata path.
+	//
+	// First:
+	//   /mnt/SDCARD/Roms/Game Boy/.mmenu/
+	//
+	// Then:
+	//   /mnt/SDCARD/Roms/Game Boy/.mmenu/Tetris.gb
 	slot_path[0] = '\0';
 	strcpy(slot_path, kRomsDir);
 	concat(slot_path, emu_name, 256);
 	concat(slot_path, "/.mmenu/", 256);
-
 	concat(slot_path, rom_file, 256);
+
+
+	// Replace the ROM extension with .txt.
+	//
+	// Before:
+	//   /mnt/SDCARD/Roms/Game Boy/.mmenu/Tetris.gb
+	//
+	// After:
+	//   /mnt/SDCARD/Roms/Game Boy/.mmenu/Tetris.txt
 	tmp = strrchr(slot_path, '.') + 1;
 	strcpy(tmp, "txt");
-	
+
+
+	// If libmmenu has recorded a last-used slot for this ROM,
+	// MinUI can display the X = Resume action.
 	can_resume = exists(slot_path);
 }
 	
 static void open_rom(char* path, char* last) {
-	char launch[256];
-	launch[0] = '"';
-	strcpy(launch+1, kEmusDir);
-
 	char emu_name[256];
+
+	// Extract the system name from the ROM path.
+	//
+	// path:
+	//   "/mnt/SDCARD/Roms/Game Boy/Tetris.gb"
+	//
+	// kRomsDir:
+	//   "/mnt/SDCARD/Roms/"
+	//
+	// path + strlen(kRomsDir):
+	//   "Game Boy/Tetris.gb"
 	strcpy(emu_name, path + strlen(kRomsDir));
+
+	// Keep only what comes before the first '/'.
+	//
+	// Before:
+	//   "Game Boy/Tetris.gb"
+	//
+	// After:
+	//   "Game Boy"
 	char* slash = strchr(emu_name, '/');
 	emu_name[slash-emu_name] = '\0';
+
+
+	// Build the standard MinUI launcher path.
+	//
+	// emu_name:
+	//   "Game Boy"
+	//
+	// minui_launch:
+	//   "/mnt/SDCARD/Emus/Game Boy.pak/launch.sh"
+	char minui_launch[256];
+	snprintf(
+		minui_launch,
+		sizeof(minui_launch),
+		"%s%s.pak/launch.sh",
+		kEmusDir,
+		emu_name
+	);
+
+
+	// PicoArch uses exactly the same system name with
+	// "-picoarch" added to the PAK name.
+	//
+	// emu_name:
+	//   "Game Boy"
+	//
+	// picoarch_launch:
+	//   "/mnt/SDCARD/Emus/Game Boy-picoarch.pak/launch.sh"
+	char picoarch_launch[256];
+	snprintf(
+		picoarch_launch,
+		sizeof(picoarch_launch),
+		"%s%s-picoarch.pak/launch.sh",
+		kEmusDir,
+		emu_name
+	);
+
+
+	// Check which implementations are actually installed.
+	int has_minui = exists(minui_launch);
+	int has_picoarch = exists(picoarch_launch);
+
+
+	// Select the preferred emulator, with automatic fallback.
+	//
+	// P mode:
+	//   PicoArch -> MinUI
+	//
+	// M mode:
+	//   MinUI -> PicoArch
+	//
+	// Example if both exist:
+	//
+	//   prefer_picoarch = 1
+	//     -> Game Boy-picoarch.pak
+	//
+	//   prefer_picoarch = 0
+	//     -> Game Boy.pak
+	char* emu_launch = NULL;
+
+	if (prefer_picoarch) {
+		if (has_picoarch) {
+			emu_launch = picoarch_launch;
+		}
+		else if (has_minui) {
+			emu_launch = minui_launch;
+		}
+	}
+	else {
+		if (has_minui) {
+			emu_launch = minui_launch;
+		}
+		else if (has_picoarch) {
+			emu_launch = picoarch_launch;
+		}
+	}
+
+	// This should normally not happen because hasRoms() hides systems
+	// with no usable emulator, but keep the guard here anyway.
+	if (emu_launch==NULL) return;
+
 
 	if (should_resume) {
 		char slot[16];
@@ -970,15 +1203,40 @@ static void open_rom(char* path, char* last) {
 		put_file(kResumeSlotPath, slot);
 		should_resume = 0;
 	}
-	
-	concat(launch, emu_name, 256);
-	concat(launch, ".pak/launch.sh\" \"", 256);
+
+
+	// Build the command MinUI will execute.
+	//
+	// emu_launch:
+	//   "/mnt/SDCARD/Emus/Game Boy-picoarch.pak/launch.sh"
+	//
+	// path:
+	//   "/mnt/SDCARD/Roms/Game Boy/Tetris.gb"
+	//
+	// final command:
+	//   "/mnt/SDCARD/Emus/Game Boy-picoarch.pak/launch.sh" "/mnt/SDCARD/Roms/Game Boy/Tetris.gb"
+	//
+	// Quotes are required because system and ROM names may contain spaces.
+	char launch[256];
+
+	launch[0] = '"';
+	strcpy(launch+1, emu_launch);
+
+	// "/mnt/.../launch.sh" "
+	concat(launch, "\" \"", 256);
+
+	// "/mnt/.../launch.sh" "/mnt/SDCARD/Roms/Game Boy/Tetris.gb
 	concat(launch, path, 256);
+
+	// "/mnt/.../launch.sh" "/mnt/SDCARD/Roms/Game Boy/Tetris.gb"
 	concat(launch, "\"", 256);
+
+
 	addRecent(path);
 	saveLast(last==NULL ? path : last);
 	queue_next(launch);
 }
+
 static void open_pak(char*path) {
 	char launch[256];
 	launch[0] = '"';
@@ -1124,6 +1382,37 @@ static void save_screenshot(SDL_Surface* surface) {
 	put_file(kScreenshotsPath, count);
 }
 
+static void load_emulator_preference(void) {
+	// The preference is represented by the presence of a file.
+	//
+	// File exists:
+	//   /mnt/SDCARD/.minui/prefer-picoarch
+	//   -> prefer_picoarch = 1
+	//   -> try PicoArch first
+	//
+	// File does not exist:
+	//   -> prefer_picoarch = 0
+	//   -> try MinUI/standalone first
+	prefer_picoarch = exists(kPreferPicoarchPath);
+}
+
+static void toggle_emulator_preference(void) {
+	// 0 -> 1
+	// 1 -> 0
+	prefer_picoarch = !prefer_picoarch;
+
+	if (prefer_picoarch) {
+		// "touch" the preference file.
+		//
+		// No contents are needed: its presence alone means PicoArch first.
+		close(open(kPreferPicoarchPath, O_WRONLY | O_CREAT, 0644));
+	}
+	else {
+		// Removing the file restores MinUI/standalone-first mode.
+		unlink(kPreferPicoarchPath);
+	}
+}
+
 int main(void) {	
 	// freopen(kRootDir "/stderr.txt", "w", stderr);
 	// freopen(kRootDir "/stdout.txt", "w", stdout);
@@ -1207,6 +1496,8 @@ int main(void) {
 	// Mix_Chunk *click = Mix_LoadWAV("/usr/trimui/res/sound/click.wav");
 	
 	load_screenshots();
+
+	load_emulator_preference();
 	
 	if (exists(kResumeSlotPath)) unlink(kResumeSlotPath);
 	
@@ -1284,8 +1575,14 @@ int main(void) {
 		
 		int selected = top->selected;
 		int total = top->entries->count;
+
+		if (Input_isPressed(kButtonStart) && Input_justPressed(kButtonUp)) {
+			toggle_emulator_preference();
+			is_dirty = 1;
+		}
+
 		if (!Input_isPressed(kButtonSelect)) {
-			if (Input_justRepeated(kButtonUp)) {
+			if (!Input_isPressed(kButtonStart) && Input_justRepeated(kButtonUp)) {
 				selected -= 1;
 				if (selected<0) {
 					selected = total-1;
@@ -1484,6 +1781,16 @@ int main(void) {
 					SDL_FreeSurface(text);
 				}
 				
+				if (!prefer_picoarch) {
+					text = TTF_RenderUTF8_Blended(
+						tiny,
+						"M",
+						(SDL_Color){0xd2,0xb4,0x6c}
+					);
+					SDL_BlitSurface(text, NULL, screen, &(SDL_Rect){278,7,0,0});
+					SDL_FreeSurface(text);
+				}
+
 				// battery
 				int charge = getBatteryLevel();
 				SDL_Surface* ui_power_icon;

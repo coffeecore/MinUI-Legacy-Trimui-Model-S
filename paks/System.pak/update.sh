@@ -61,6 +61,16 @@ for SRC in `find . -name "*.pak"` ; do
 			else
 				ROM_DIR=${DST/.pak/}
 				ROM_DIR=${ROM_DIR/Emus/Roms}
+
+				# PicoArch PAKs share the ROM directory of their MinUI counterpart.
+				#
+				# Examples:
+				#   /mnt/SDCARD/Roms/Game Boy
+				#       -> /mnt/SDCARD/Roms/Game Boy
+				#
+				#   /mnt/SDCARD/Roms/Game Boy-picoarch
+				#       -> /mnt/SDCARD/Roms/Game Boy
+				ROM_DIR=${ROM_DIR%-picoarch}
 			fi
 
 			if [ ! -d "$ROM_DIR" ]; then
