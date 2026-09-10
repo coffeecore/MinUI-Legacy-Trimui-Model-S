@@ -22,6 +22,7 @@
 #define kRootDir "/mnt/SDCARD"
 #define kEmusDir kRootDir "/Emus/"
 #define kRomsDir kRootDir "/Roms/"
+#define kCollectionsDir kRootDir "/Collections"
 #define kResDir kRootDir "/System/res/"
 #define kRecentlyPlayedDir kRootDir "/Recently Played"
 #define kLastPath "/tmp/last.txt"
@@ -394,6 +395,34 @@ static int hasPaks(char* path) {
 	return has;
 }
 
+static int hasCollections(void) {
+    int has = 0;
+
+    if (!exists(kCollectionsDir)) return has;
+
+    DIR* dh = opendir(kCollectionsDir);
+    if (dh == NULL) return has;
+
+    struct dirent* dp;
+
+    while ((dp = readdir(dh)) != NULL) {
+        if (hide(dp->d_name)) continue;
+
+		// Collections are .txt files.
+		// map.txt is reserved for display-name aliases and must not
+		// itself appear as a collection.
+		if (!match_suffix(".txt", dp->d_name)) continue;
+		if (exact_match("map.txt", dp->d_name)) continue;
+
+        has = 1;
+        break;
+    }
+
+    closedir(dh);
+
+    return has;
+}
+
 static int hasRoms(char* path) {
 	int has = 0;
 
@@ -504,8 +533,67 @@ static Array* getRecents(void) {
 	}
 	return entries;
 }
+
+static Array* getCollection(char* path) {
+    Array* entries = Array_new();
+
+    FILE* file = fopen(path, "r");
+
+    if (file) {
+        char line[256];
+
+        while (fgets(line, 256, file) != NULL) {
+            int len = strlen(line);
+
+            // Remove Unix newline.
+            if (len > 0 && line[len - 1] == '\n') {
+                line[len - 1] = '\0';
+                len -= 1;
+
+                // Also handle Windows CRLF line endings.
+                if (len > 0 && line[len - 1] == '\r') {
+                    line[len - 1] = '\0';
+                    len -= 1;
+                }
+            }
+
+            // Ignore empty lines.
+            if (len == 0) continue;
+
+            // Collection paths are stored relative to the SD-card root:
+            //
+            //   /Roms/Game Boy/Tetris.gb
+            //
+            // and become:
+            //
+            //   /mnt/SDCARD/Roms/Game Boy/Tetris.gb
+            char sd_path[256];
+            sd_path[0] = '\0';
+            concat(sd_path, kRootDir, 256);
+            concat(sd_path, line, 256);
+
+            // Ignore entries whose target no longer exists.
+            if (!exists(sd_path)) continue;
+
+            // Keep the original Legacy behavior:
+            // .pak entries remain launchable PAKs, everything else is a ROM.
+            int type = match_suffix(".pak", sd_path) ? kEntryPak : kEntryRom;
+
+            Array_push(entries, Entry_new(sd_path, type));
+        }
+
+        fclose(file);
+    }
+
+    return entries;
+}
+
 static Array* getEntries(char* path) {
 	Array* entries = Array_new();
+	// Collection files are displayed as directories.
+	// Directory_new() will later use the .txt file as the source
+	// for the collection contents.
+	int is_collections = exact_match(path, kCollectionsDir);
 	DIR *dh = opendir(path);
 	if (dh!=NULL) {
 		struct dirent *dp;
@@ -516,6 +604,13 @@ static Array* getEntries(char* path) {
 		char* tmp = full_path + strlen(full_path);
 		while((dp = readdir(dh)) != NULL) {
 			if (hide(dp->d_name)) continue;
+			if (is_collections) {
+				// Only .txt files are collections.
+				if (!match_suffix(".txt", dp->d_name)) continue;
+
+				// map.txt configures display names; it isn't a collection.
+				if (exact_match("map.txt", dp->d_name)) continue;
+			}
 			strcpy(tmp, dp->d_name);
 			tmp[strlen(dp->d_name)] = '\0';
 			int is_dir = dp->d_type==DT_DIR;
@@ -529,7 +624,9 @@ static Array* getEntries(char* path) {
 				}
 			}
 			else {
-				type = kEntryRom;
+				// A collection is a text file on disk but behaves like a directory
+				// in the MinUI interface.
+				type = is_collections ? kEntryDir : kEntryRom;
 			}
 			Array_push(entries, Entry_new(full_path, type));
 		}
@@ -550,32 +647,119 @@ static Array* getRoot(void) {
 	if (has_recents) Array_push(entries, Entry_new(kRecentlyPlayedDir, kEntryDir));
 	
 	char* path = kRootDir "/Roms";
+
+	// This temporary array contains only visible systems.
+	// Keeping it outside the /Roms opendir() block also lets us handle
+	// Collections when /Roms does not exist at all.
+	Array* emus = Array_new();
+
 	DIR *dh = opendir(path);
 	if (dh!=NULL) {
 		struct dirent *dp;
+
 		char full_path[256];
 		full_path[0] = '\0';
 		concat(full_path, path, 256);
 		concat(full_path, "/", 256);
+
+		// tmp always points just after "/mnt/SDCARD/Roms/".
+		// Each iteration overwrites only the system-name part.
 		char* tmp = full_path + strlen(full_path);
-		Array* emus = Array_new();
+
 		while((dp = readdir(dh)) != NULL) {
 			if (hide(dp->d_name)) continue;
 			strcpy(tmp, dp->d_name);
 			tmp[strlen(dp->d_name)] = '\0';
-			
+
+			// Only expose a system when it has ROMs and at least one
+			// usable MinUI/PicoArch emulator according to hasRoms().
 			if (hasRoms(full_path)) {
 				Array_push(emus, Entry_new(full_path, kEntryDir));
 				has_roms = 1;
 			}
 		}
-		EntryArray_sort(emus);
-		for (int i=0; i<emus->count; i++) {
-			Array_push(entries, emus->items[i]);
-		}
-		Array_free(emus); // just free the array part, root now owns emus entries
+
 		closedir(dh);
 	}
+
+	// Systems are displayed alphabetically.
+	EntryArray_sort(emus);
+
+	if (hasCollections()) {
+		if (emus->count) {
+			// Normal case:
+			// we have visible systems, so Collections appears as one
+			// additional directory in the root menu.
+			Array_push(entries, Entry_new(kCollectionsDir, kEntryDir));
+		}
+		else {
+			// No visible systems:
+			// individual collection files are promoted directly to root.
+			DIR* collections_dh = opendir(kCollectionsDir);
+
+			if (collections_dh != NULL) {
+				struct dirent* dp;
+
+				char full_path[256];
+				full_path[0] = '\0';
+				concat(full_path, kCollectionsDir, 256);
+				concat(full_path, "/", 256);
+
+				// Example:
+				//
+				// full_path = "/mnt/SDCARD/Collections/"
+				// tmp -------^ points here
+				//
+				// We keep the directory prefix intact and overwrite only
+				// the filename on each iteration.
+				char* tmp = full_path + strlen(full_path);
+
+				// Temporary array so collections can be sorted before
+				// transferring their Entry objects to entries.
+				Array* collections = Array_new();
+
+				while((dp = readdir(collections_dh)) != NULL) {
+					if (hide(dp->d_name)) continue;
+					// Only actual collection files are promoted to root.
+					if (!match_suffix(".txt", dp->d_name)) continue;
+					if (exact_match("map.txt", dp->d_name)) continue;
+					strcpy(tmp, dp->d_name);
+					tmp[strlen(dp->d_name)] = '\0';
+
+					// A collection is physically a .txt file, but MinUI
+					// intentionally exposes it as a directory.
+					//
+					// Later Directory_new() will recognize this path and
+					// load the ROM paths contained in the file.
+					Array_push(collections, Entry_new(full_path, kEntryDir));
+				}
+
+				EntryArray_sort(collections);
+
+				// Transfer ownership of the Entry objects to entries.
+				for (int i=0; i<collections->count; i++) {
+					Array_push(entries, collections->items[i]);
+				}
+
+				// Important: Array_free() only frees the Array container and
+				// its items pointer. It does NOT free the Entry objects.
+				// Those are now owned by entries.
+				Array_free(collections);
+
+				closedir(collections_dh);
+			}
+		}
+	}
+
+	// Collections have been added first.
+	// Now append the visible systems.
+	for (int i=0; i<emus->count; i++) {
+		Array_push(entries, emus->items[i]);
+	}
+
+	// entries now owns the Entry objects.
+	// Only destroy the temporary Array container.
+	Array_free(emus);
 	
 	if (has_games) Array_push(entries, Entry_new(kRootDir "/Games", kEntryDir));
 	if (has_tools) Array_push(entries, Entry_new(kRootDir "/Tools", kEntryDir));
@@ -664,25 +848,36 @@ typedef struct Directory {
 } Directory;
 
 static void Directory_index(Directory* self) {
-	Entry* prior = NULL;
-	int alpha = -1;
-	int index = 0;
-	for (int i=0; i<self->entries->count; i++) {
-		Entry* entry = self->entries->items[i];
-		if (prior!=NULL && exact_match(prior->name, entry->name)) {
-			prior->conflict = 1;
-			entry->conflict = 1;
-		}
-		int a = index_char(entry->name);
-		if (a!=alpha) {
-			index = self->alphas->count;
-			IntArray_push(self->alphas, i);
-			alpha = a;
-		}
-		entry->alpha = index;
-		
-		prior = entry;
-	}
+    // Collection contents keep the explicit order from the .txt file,
+    // so alphabetical navigation does not apply to them.
+    int skip_index = match_prefix(kCollectionsDir "/", self->path);
+
+    Entry* prior = NULL;
+    int alpha = -1;
+    int index = 0;
+
+    for (int i=0; i<self->entries->count; i++) {
+        Entry* entry = self->entries->items[i];
+
+        if (prior!=NULL && exact_match(prior->name, entry->name)) {
+            prior->conflict = 1;
+            entry->conflict = 1;
+        }
+
+        if (!skip_index) {
+            int a = index_char(entry->name);
+
+            if (a!=alpha) {
+                index = self->alphas->count;
+                IntArray_push(self->alphas, i);
+                alpha = a;
+            }
+
+            entry->alpha = index;
+        }
+
+        prior = entry;
+    }
 }
 
 static Directory* Directory_new(char* path, int selected) {
@@ -693,6 +888,11 @@ static Directory* Directory_new(char* path, int selected) {
 	}
 	else if (exact_match(path, kRecentlyPlayedDir)) {
 		self->entries = getRecents();
+	}
+	else if (match_prefix(kCollectionsDir "/", path) &&
+		match_suffix(".txt", path)
+	) {
+		self->entries = getCollection(path);
 	}
 	else if (match_suffix(".m3u", path)) {
 		self->entries = getDiscs(path);
@@ -1296,7 +1496,36 @@ static void close_directory(void) {
 
 static void Entry_open(Entry* self) {
 	if (self->type==kEntryRom) {
-		open_rom(self->path, NULL);
+		char* last = NULL;
+		char last_path[256];
+
+		// When launching from a collection, the ROM path itself points to
+		// /Roms/... and therefore does not contain the collection context.
+		//
+		// Build a fake path used only by saveLast():
+		//
+		//   /Collections/Shmups.txt/donpachi.zip
+		//
+		// The real ROM path is still passed unchanged to open_rom().
+		if (
+			match_prefix(kCollectionsDir "/", top->path) &&
+			match_suffix(".txt", top->path)
+		) {
+			char* filename = strrchr(self->path, '/');
+
+			if (filename != NULL) {
+				snprintf(
+					last_path,
+					sizeof(last_path),
+					"%s/%s",
+					top->path,
+					filename + 1
+				);
+
+				last = last_path;
+			}
+		}
+		open_rom(self->path, last);
 	}
 	else if (self->type==kEntryPak) {
 		open_pak(self->path);
@@ -1311,7 +1540,27 @@ static void loadLast(void) { // call after loading root directory
 
 	char last_path[256];
 	get_file(kLastPath, last_path);
-	
+
+	// Keep this information before last_path is progressively truncated below.
+	int is_collection = match_prefix(kCollectionsDir "/", last_path);
+
+	char filename[256];
+	filename[0] = '\0';
+
+	if (is_collection) {
+		char* tmp = strrchr(last_path, '/');
+
+		if (tmp != NULL) {
+			// Keep the leading "/" too:
+			//
+			//   "/donpachi.zip"
+			//
+			// This prevents "donpachi.zip" from also matching something like
+			// "other-donpachi.zip".
+			strcpy(filename, tmp);
+		}
+	}
+
 	Array* last = Array_new();
 	while (!exact_match(last_path, kRootDir)) {
 		Array_push(last, copy_string(last_path));
@@ -1324,7 +1573,15 @@ static void loadLast(void) { // call after loading root directory
 		char* path = Array_pop(last);
 		for (int i=0; i<top->entries->count; i++) {
 			Entry* entry = top->entries->items[i];
-			if (exact_match(entry->path, path)) {
+			int matches_path = exact_match(entry->path, path);
+
+			int matches_collection_rom =
+				is_collection &&
+				last->count == 0 &&
+				filename[0] != '\0' &&
+				match_suffix(filename, entry->path);
+
+			if (matches_path || matches_collection_rom) {
 				top->selected = i;
 				if (i>=top->end) {
 					top->start = i;
