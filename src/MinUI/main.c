@@ -70,7 +70,7 @@ static int exact_match(char* str1, char* str2) {
 	if (len1!=strlen(str2)) return 0;
 	return  (strncmp(str1,str2,len1)==0);
 }
-static void concat(char* str1, char* str2, int maxlen) {
+static void concat(char* str1, const char* str2, int maxlen) {
 	int len1 = strlen(str1);
 	int len2 = strlen(str2);
 	if (len1+len2+1>maxlen) puts("concat overstepped its bounds"); // TODO: lock this down
@@ -107,9 +107,13 @@ static void get_file(char* path, char* buffer) {
 
 static int hide(char* name) {
 	if (name[0]=='.') return 1;
+
+	// Reserved MinUI display-name mapping file.
+	if (exact_match("map.txt", name)) return 1;
 	
 	// TODO: these might not be necessary? unless a user just renames their stock folders...
 	if (match_suffix("_cache.db", name)) return 1;
+	if (match_suffix(".hidden", name)) return 1;
 	if (match_prefix("COPYING", name)) return 1;
 	if (exact_match("license", name)) return 1;
 	if (exact_match("LICENSE", name)) return 1;
@@ -408,11 +412,8 @@ static int hasCollections(void) {
     while ((dp = readdir(dh)) != NULL) {
         if (hide(dp->d_name)) continue;
 
-		// Collections are .txt files.
-		// map.txt is reserved for display-name aliases and must not
-		// itself appear as a collection.
+		// Only .txt files are collections.
 		if (!match_suffix(".txt", dp->d_name)) continue;
-		if (exact_match("map.txt", dp->d_name)) continue;
 
         has = 1;
         break;
@@ -524,13 +525,176 @@ static int hasUpdate(void) {
 	return has;
 }
 
+static void getParentDir(const char* path, char* buffer) {
+	strcpy(buffer, path);
+
+	char* separator = strrchr(buffer, '/');
+
+	if (separator) {
+		separator[0] = '\0';
+	}
+}
+
+static int applyMap(const char* path, Array* entries) {
+	char map_path[256];
+	map_path[0] = '\0';
+	concat(map_path, path, 256);
+	concat(map_path, "/map.txt", 256);
+
+	FILE* file = fopen(map_path, "r");
+	if (!file) return 0;
+
+	int filter = 0;
+	char line[256];
+
+	while (fgets(line, 256, file) != NULL) {
+		int len = strlen(line);
+
+		// Remove Unix or Windows line endings.
+		if (len > 0 && line[len - 1] == '\n') {
+			line[len - 1] = '\0';
+			len -= 1;
+
+			if (len > 0 && line[len - 1] == '\r') {
+				line[len - 1] = '\0';
+				len -= 1;
+			}
+		}
+
+		if (len == 0) continue;
+
+		// ';' is our preferred separator.
+		// A tab is also accepted for compatibility with standard MinUI map.txt files.
+		char* separator = strchr(line, ';');
+		char* tab = strchr(line, '\t');
+
+		// Use whichever valid separator occurs first.
+		if (tab && (!separator || tab < separator)) {
+			separator = tab;
+		}
+
+		if (!separator) continue;
+
+		separator[0] = '\0';
+
+		char* filename = line;
+		char* alias = separator + 1;
+
+		// Ignore malformed mappings.
+		if (filename[0] == '\0' || alias[0] == '\0') continue;
+
+		for (int i=0; i<entries->count; i++) {
+			Entry* entry = entries->items[i];
+
+			char* slash = strrchr(entry->path, '/');
+			if (!slash) continue;
+
+			// The map only applies to entries physically located
+			// in the directory containing this map.txt.
+			size_t dir_len = slash - entry->path;
+
+			if (
+				strlen(path) != dir_len ||
+				strncmp(entry->path, path, dir_len) != 0
+			) {
+				continue;
+			}
+
+			char* entry_filename = slash + 1;
+
+			if (!exact_match(filename, entry_filename)) continue;
+
+			free(entry->name);
+			entry->name = copy_string(alias);
+
+			if (entry->name[0] == '.') filter = 1;
+		}
+	}
+
+	fclose(file);
+
+	return filter;
+}
+
+static Array* filterHiddenEntries(Array* entries) {
+	Array* filtered = Array_new();
+
+	for (int i=0; i<entries->count; i++) {
+		Entry* entry = entries->items[i];
+
+		if (entry->name[0] == '.') {
+			Entry_free(entry);
+		}
+		else {
+			// Ownership moves to the new Array.
+			Array_push(filtered, entry);
+		}
+	}
+
+	Array_free(entries);
+
+	return filtered;
+}
+
+static Array* applySourceMaps(Array* entries) {
+	int filter = 0;
+
+	for (int i=0; i<entries->count; i++) {
+		Entry* entry = entries->items[i];
+
+		// For now aliases come from ROM directories.
+		// Recently Played can also contain .pak games.
+		if (!match_prefix(kRomsDir, entry->path)) continue;
+
+		char dir[256];
+		getParentDir(entry->path, dir);
+
+		// Has this source directory already been processed?
+		int processed = 0;
+
+		for (int j=0; j<i; j++) {
+			Entry* prior = entries->items[j];
+
+			if (!match_prefix(kRomsDir, prior->path)) continue;
+
+			char prior_dir[256];
+			getParentDir(prior->path, prior_dir);
+
+			if (exact_match(dir, prior_dir)) {
+				processed = 1;
+				break;
+			}
+		}
+
+		if (processed) continue;
+
+		if (applyMap(dir, entries)) {
+			filter = 1;
+		}
+	}
+
+	if (filter) {
+		entries = filterHiddenEntries(entries);
+	}
+
+	return entries;
+}
+
 static Array* getRecents(void) {
 	Array* entries = Array_new();
+
 	for (int i=0; i<recents->count; i++) {
 		char* path = recents->items[i];
 		int type = match_suffix(".pak", path) ? kEntryPak : kEntryRom;
+
 		Array_push(entries, Entry_new(path, type));
 	}
+
+	// Recents can contain ROMs from several systems.
+	// Apply each ROM's source-directory map.txt while preserving
+	// the newest-to-oldest order.
+	entries = applySourceMaps(entries);
+
 	return entries;
 }
 
@@ -585,7 +749,11 @@ static Array* getCollection(char* path) {
         fclose(file);
     }
 
-    return entries;
+	// A collection can contain ROMs from several systems.
+	// Apply the map.txt belonging to each ROM's original directory.
+	entries = applySourceMaps(entries);
+
+	return entries;
 }
 
 static Array* getEntries(char* path) {
@@ -607,9 +775,6 @@ static Array* getEntries(char* path) {
 			if (is_collections) {
 				// Only .txt files are collections.
 				if (!match_suffix(".txt", dp->d_name)) continue;
-
-				// map.txt configures display names; it isn't a collection.
-				if (exact_match("map.txt", dp->d_name)) continue;
 			}
 			strcpy(tmp, dp->d_name);
 			tmp[strlen(dp->d_name)] = '\0';
@@ -632,9 +797,25 @@ static Array* getEntries(char* path) {
 		}
 		closedir(dh);
 	}
+
+	// Apply display-name aliases before sorting so the menu order
+	// follows the displayed names rather than the physical filenames.
+	if (
+		match_prefix(kRomsDir, path) ||
+		exact_match(kCollectionsDir, path)
+	) {
+		int filter = applyMap(path, entries);
+
+		if (filter) {
+			entries = filterHiddenEntries(entries);
+		}
+	}
+
 	EntryArray_sort(entries);
+
 	return entries;
 }
+
 static int has_roms = 0;
 static Array* getRoot(void) {
 	Array* entries = Array_new();
@@ -682,7 +863,15 @@ static Array* getRoot(void) {
 		closedir(dh);
 	}
 
-	// Systems are displayed alphabetically.
+	// Apply display-name aliases to systems before sorting.
+	// /Roms/map.txt uses the real system directory name as its key.
+	int filter = applyMap(path, emus);
+
+	if (filter) {
+		emus = filterHiddenEntries(emus);
+	}
+
+	// Systems are displayed alphabetically using their display names.
 	EntryArray_sort(emus);
 
 	if (hasCollections()) {
@@ -722,7 +911,6 @@ static Array* getRoot(void) {
 					if (hide(dp->d_name)) continue;
 					// Only actual collection files are promoted to root.
 					if (!match_suffix(".txt", dp->d_name)) continue;
-					if (exact_match("map.txt", dp->d_name)) continue;
 					strcpy(tmp, dp->d_name);
 					tmp[strlen(dp->d_name)] = '\0';
 
@@ -732,6 +920,14 @@ static Array* getRoot(void) {
 					// Later Directory_new() will recognize this path and
 					// load the ROM paths contained in the file.
 					Array_push(collections, Entry_new(full_path, kEntryDir));
+				}
+
+				// Collections can also be promoted directly to root when there are
+				// no visible systems, so apply /Collections/map.txt here as well.
+				int filter = applyMap(kCollectionsDir, collections);
+
+				if (filter) {
+					collections = filterHiddenEntries(collections);
 				}
 
 				EntryArray_sort(collections);
