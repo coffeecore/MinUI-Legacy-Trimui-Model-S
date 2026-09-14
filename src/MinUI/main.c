@@ -829,7 +829,8 @@ static Array* getRoot(void) {
 	
 	char* path = kRootDir "/Roms";
 
-	// This temporary array contains only visible systems.
+	// This temporary array contains systems with ROMs and a usable emulator.
+	// map.txt aliases may hide some of them afterwards.
 	// Keeping it outside the /Roms opendir() block also lets us handle
 	// Collections when /Roms does not exist at all.
 	Array* emus = Array_new();
@@ -1386,7 +1387,7 @@ static int has_cue(char* path, char* auto_path) {
 }
 
 static int can_resume = 0;
-static int should_resume = 0; // set to 1 on TRIMUI_START but only if can_resume==1
+static int should_resume = 0; // set to 1 on X when can_resume==1
 // Path to libmmenu's last-used save slot metadata for the selected ROM.
 //
 // Example:
@@ -1406,7 +1407,7 @@ static void ready_resume(Entry* entry) {
 	char path[256];
 	strcpy(path, entry->path);
 
-	// Resume only applies to ROM entries.
+	// Resume only applies to entries under /Roms.
 	if (!match_prefix(kRomsDir, path)) return;
 
 
