@@ -680,6 +680,153 @@ static Array* applySourceMaps(Array* entries) {
 	return entries;
 }
 
+// Collections and Recently Played can mix ROMs from several systems.
+// Append the system display name to each ROM so its source remains visible
+// without changing the real ROM path used for launching.
+//
+// The system name follows the same /Roms/map.txt aliases used by the root menu.
+//
+// Example:
+//   path: /mnt/SDCARD/Roms/Neo Geo/mslug.zip
+//   ROM map.txt: mslug.zip;Metal Slug
+//   /Roms/map.txt: Neo Geo;SNK Neo Geo
+//
+// becomes:
+//   Metal Slug (SNK Neo Geo)
+//
+// If a system has no alias, its physical directory name is used instead.
+static int getEntrySystemName(Entry* entry, char* system, size_t size) {
+	if (!match_prefix(kRomsDir, entry->path)) return 0;
+
+	char* relative = entry->path + strlen(kRomsDir);
+	char* slash = strchr(relative, '/');
+	if (!slash) return 0;
+
+	size_t system_len = slash - relative;
+	if (system_len == 0) return 0;
+
+	if (system_len >= size) system_len = size - 1;
+	memcpy(system, relative, system_len);
+	system[system_len] = '\0';
+
+	return 1;
+}
+
+static void appendSystemName(Entry* entry, const char* system) {
+	// " (" + system + ")" + terminating null byte.
+	size_t display_len = strlen(entry->name) + strlen(system) + 4;
+	char* display_name = malloc(display_len);
+
+	snprintf(
+		display_name,
+		display_len,
+		"%s (%s)",
+		entry->name,
+		system
+	);
+
+	free(entry->name);
+	entry->name = display_name;
+}
+
+static void appendSourceSystemNames(Array* entries) {
+	// Track which entries received an alias from /Roms/map.txt.
+	// Any remaining ROM entry will fall back to its physical system directory.
+	int* mapped = calloc(entries->count, sizeof(int));
+
+	char map_path[256];
+	map_path[0] = '\0';
+	concat(map_path, kRootDir "/Roms", 256);
+	concat(map_path, "/map.txt", 256);
+
+	FILE* file = fopen(map_path, "r");
+
+	if (file) {
+		char line[256];
+
+		while (fgets(line, 256, file) != NULL) {
+			int len = strlen(line);
+
+			// Remove Unix or Windows line endings.
+			if (len > 0 && line[len - 1] == '\n') {
+				line[len - 1] = '\0';
+				len -= 1;
+
+				if (len > 0 && line[len - 1] == '\r') {
+					line[len - 1] = '\0';
+					len -= 1;
+				}
+			}
+
+			if (len == 0) continue;
+
+			// Keep the same separators accepted by applyMap(): our preferred ';'
+			// plus tab compatibility with standard MinUI map.txt files.
+			char* separator = strchr(line, ';');
+			char* tab = strchr(line, '\t');
+
+			if (tab && (!separator || tab < separator)) {
+				separator = tab;
+			}
+
+			if (!separator) continue;
+
+			separator[0] = '\0';
+
+			char* physical_system = line;
+			char* alias = separator + 1;
+
+			if (physical_system[0] == '\0' || alias[0] == '\0') continue;
+
+			// A leading '.' remains the visibility marker used by /Roms/map.txt:
+			// applyMap() will still hide that system from the root systems list.
+			//
+			// Collections and Recently Played are mixed-system views, though, so the
+			// alias is still useful there as a label. Strip only the leading marker:
+			//
+			//   Neo Geo;.SNK Neo Geo
+			//
+			// root systems list      -> hidden
+			// Collections / Recents -> "Metal Slug (SNK Neo Geo)"
+			//
+			// If the alias is only ".", leave the entry unmapped so the fallback
+			// below uses the physical system directory instead of displaying "()".
+			if (alias[0] == '.') {
+				alias += 1;
+				if (alias[0] == '\0') continue;
+			}
+
+			for (int i=0; i<entries->count; i++) {
+				if (mapped[i]) continue;
+
+				Entry* entry = entries->items[i];
+				char system[256];
+
+				if (!getEntrySystemName(entry, system, sizeof(system))) continue;
+				if (!exact_match(physical_system, system)) continue;
+
+				appendSystemName(entry, alias);
+				mapped[i] = 1;
+			}
+		}
+
+		fclose(file);
+	}
+
+	// No usable alias: use the real /Roms/<system> folder.
+	for (int i=0; i<entries->count; i++) {
+		if (mapped[i]) continue;
+
+		Entry* entry = entries->items[i];
+		char system[256];
+
+		if (!getEntrySystemName(entry, system, sizeof(system))) continue;
+		appendSystemName(entry, system);
+	}
+
+	free(mapped);
+}
+
 static Array* getRecents(void) {
 	Array* entries = Array_new();
 
@@ -694,6 +841,11 @@ static Array* getRecents(void) {
 	// Apply each ROM's source-directory map.txt while preserving
 	// the newest-to-oldest order.
 	entries = applySourceMaps(entries);
+
+	// Make the source system explicit in this mixed-system view.
+	// Example with /Roms/map.txt alias "Neo Geo;SNK Neo Geo":
+	// "Metal Slug" becomes "Metal Slug (SNK Neo Geo)".
+	appendSourceSystemNames(entries);
 
 	return entries;
 }
@@ -724,17 +876,26 @@ static Array* getCollection(char* path) {
             // Ignore empty lines.
             if (len == 0) continue;
 
-            // Collection paths are stored relative to the SD-card root:
+            // Standard MinUI collections store paths relative to the SD-card root:
             //
             //   /Roms/Game Boy/Tetris.gb
             //
-            // and become:
+            // This fork also accepts an already absolute SD-card path:
             //
             //   /mnt/SDCARD/Roms/Game Boy/Tetris.gb
+            //
+            // Supporting both keeps existing MinUI collections compatible while
+            // also accepting manually-created absolute paths.
             char sd_path[256];
             sd_path[0] = '\0';
-            concat(sd_path, kRootDir, 256);
-            concat(sd_path, line, 256);
+
+            if (match_prefix(kRootDir "/", line)) {
+                concat(sd_path, line, 256);
+            }
+            else {
+                concat(sd_path, kRootDir, 256);
+                concat(sd_path, line, 256);
+            }
 
             // Ignore entries whose target no longer exists.
             if (!exists(sd_path)) continue;
@@ -752,6 +913,11 @@ static Array* getCollection(char* path) {
 	// A collection can contain ROMs from several systems.
 	// Apply the map.txt belonging to each ROM's original directory.
 	entries = applySourceMaps(entries);
+
+	// Make the source system explicit in this mixed-system view.
+	// Example with /Roms/map.txt alias "Neo Geo;SNK Neo Geo":
+	// "Metal Slug" becomes "Metal Slug (SNK Neo Geo)".
+	appendSourceSystemNames(entries);
 
 	return entries;
 }
@@ -1987,6 +2153,9 @@ int main(void) {
 	int needs_scrolling = 0;
 	int is_scrolling = 0;
 	int scroll_ox = 0;
+	// +1 moves the visible window towards the end of the text (text moves left).
+	// -1 moves it back towards the beginning, creating a ping-pong/bounce effect.
+	int scroll_direction = 1;
 	int disable_sleep = exists("/tmp/disable-sleep");
 	unsigned long cancel_start = SDL_GetTicks();
 	unsigned long wait_start = SDL_GetTicks();
@@ -2149,15 +2318,16 @@ int main(void) {
 		}
 		
 		unsigned long now = SDL_GetTicks();
-		#define kWaitDelay 1000
+		#define kScrollPauseDelay 750
 		if (cancel_wait) {
+			// Any user interaction restarts the selected label from its beginning.
 			wait_start = now;
 			scroll_ox = 0;
+			scroll_direction = 1;
 			is_scrolling = 0;
 		}
-		if (now-wait_start>=kWaitDelay) {
+		if (now-wait_start>=kScrollPauseDelay) {
 			is_scrolling = 1;
-			scroll_ox += 1;
 		}
 		
 		#define kSleepDelay 30000
@@ -2348,12 +2518,30 @@ int main(void) {
 			char* name = entry->conflict ? fullname : entry->name;
 			
 			text = TTF_RenderUTF8_Blended(font, name, (SDL_Color){0x68,0x5a,0x35});
-			if (text->w-scroll_ox>kMaxTextWidth) {
-				// bar
+			int max_scroll = text->w - kMaxTextWidth;
+
+			if (max_scroll>0) {
+				// Move one pixel per frame. When either end is reached, reverse
+				// direction and pause there for 0.75 seconds before moving again.
+				scroll_ox += scroll_direction;
+
+				if (scroll_ox>=max_scroll) {
+					scroll_ox = max_scroll;
+					scroll_direction = -1;
+					is_scrolling = 0;
+					wait_start = now;
+				}
+				else if (scroll_ox<=0) {
+					scroll_ox = 0;
+					scroll_direction = 1;
+					is_scrolling = 0;
+					wait_start = now;
+				}
+
+				// Redraw only the selected row over its highlight bar.
 				SDL_BlitSurface(ui_highlight_bar, NULL, screen, &(SDL_Rect){0,38+y,0,0});
 			
 				// shadow
-				// NOTE: text creation moved outside conditional
 				SDL_BlitSurface(text, &(SDL_Rect){scroll_ox,0,kMaxTextWidth,text->h}, screen, &(SDL_Rect){16+1,38+y+6+2,kMaxTextWidth,text->h});
 				SDL_FreeSurface(text);
 			
@@ -2363,7 +2551,12 @@ int main(void) {
 				SDL_Flip(screen); // TODO: just update the modified rect?
 			}
 			else {
+				// The selected label no longer needs scrolling (for example after a
+				// directory/selection change that triggered a redraw).
 				needs_scrolling = 0;
+				scroll_ox = 0;
+				scroll_direction = 1;
+				is_scrolling = 0;
 				SDL_FreeSurface(text);
 			}
 		}
