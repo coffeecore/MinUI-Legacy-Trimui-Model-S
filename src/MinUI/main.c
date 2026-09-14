@@ -110,6 +110,10 @@ static int hide(char* name) {
 
 	// Reserved MinUI display-name mapping file.
 	if (exact_match("map.txt", name)) return 1;
+
+	// ROM preview images live in a dedicated res directory next to the ROMs.
+	// It is implementation data and must never appear as a browsable game entry.
+	if (exact_match("res", name)) return 1;
 	
 	// TODO: these might not be necessary? unless a user just renames their stock folders...
 	if (match_suffix("_cache.db", name)) return 1;
@@ -1375,6 +1379,186 @@ Directory* top;
 
 static int prefer_picoarch = 0;
 
+// Game previews are intentionally session-only.
+// Start + Right toggles them and the value is not written to the SD card.
+// Starting disabled keeps the normal MinUI view until the user asks for previews.
+static int previews_enabled = 0;
+
+// Keep only one already-scaled preview in memory. The Model S is small enough
+// that caching several full images would cost RAM for very little benefit.
+//
+// preview_entry_path is also remembered when no PNG exists. That prevents
+// repeated filesystem lookups every time the same menu entry is redrawn.
+static SDL_Surface* preview_surface = NULL;
+static char preview_entry_path[256] = "";
+
+static void clearPreview(void) {
+	if (preview_surface != NULL) {
+		SDL_FreeSurface(preview_surface);
+		preview_surface = NULL;
+	}
+
+	preview_entry_path[0] = '\0';
+}
+
+// Build the preview path from the real ROM path, never from Entry.name.
+// This means map.txt aliases, Collections and Recently Played all resolve
+// exactly the same preview.
+//
+// Example:
+//   /mnt/SDCARD/Roms/Neo Geo/mslug.zip
+//
+// becomes:
+//   /mnt/SDCARD/Roms/Neo Geo/res/mslug.png
+//
+// The first directory below /Roms is always treated as the system directory.
+// This also keeps the preview location stable if a game entry is nested deeper.
+static int getPreviewPath(Entry* entry, char* preview_path, size_t size) {
+	if (entry == NULL || !match_prefix(kRomsDir, entry->path)) return 0;
+
+	char* relative = entry->path + strlen(kRomsDir);
+	char* system_end = strchr(relative, '/');
+
+	// /Roms/Neo Geo is the system itself, not a game inside that system.
+	if (system_end == NULL || system_end == relative) return 0;
+
+	size_t system_len = system_end - relative;
+	char* filename = strrchr(entry->path, '/');
+	if (filename == NULL || filename[1] == '\0') return 0;
+	filename += 1;
+
+	// Preview filenames use the real ROM filename with only its last extension
+	// removed. For example "mslug.zip" becomes "mslug.png".
+	char basename[256];
+	snprintf(basename, sizeof(basename), "%s", filename);
+
+	char* extension = strrchr(basename, '.');
+	if (extension != NULL && extension != basename) {
+		extension[0] = '\0';
+	}
+
+	int written = snprintf(
+		preview_path,
+		size,
+		"%s%.*s/res/%s.png",
+		kRomsDir,
+		(int)system_len,
+		relative,
+		basename
+	);
+
+	return written > 0 && (size_t)written < size;
+}
+
+// Load and scale a preview only when the selected real path changes.
+//
+// The image uses a "contain" fit: it is made as large as possible while
+// remaining entirely inside the 320x240 screen. Its aspect ratio is preserved,
+// so portrait images leave MinUI visible on the left/right and very wide images
+// leave MinUI visible above/below. Nothing is cropped or distorted.
+//
+// Scaling happens once here. Rendering later is therefore only a cheap blit.
+static void updatePreview(Entry* entry) {
+	if (!previews_enabled) {
+		clearPreview();
+		return;
+	}
+
+	if (entry == NULL) {
+		clearPreview();
+		return;
+	}
+
+	if (exact_match(preview_entry_path, entry->path)) return;
+
+	// Selection changed: discard the previous image first, then remember this
+	// entry even when no PNG exists so we do not keep probing the SD card.
+	if (preview_surface != NULL) {
+		SDL_FreeSurface(preview_surface);
+		preview_surface = NULL;
+	}
+	snprintf(preview_entry_path, sizeof(preview_entry_path), "%s", entry->path);
+
+	char preview_path[256];
+	if (!getPreviewPath(entry, preview_path, sizeof(preview_path))) return;
+
+	SDL_Surface* loaded = IMG_Load(preview_path);
+	if (loaded == NULL) return;
+
+	// Convert to the current display format before stretching. SDL_SoftStretch
+	// works best when source and destination use the same pixel format.
+	SDL_Surface* converted = SDL_DisplayFormat(loaded);
+	SDL_FreeSurface(loaded);
+	if (converted == NULL) return;
+
+	int target_w;
+	int target_h;
+
+	// Compare the aspect ratios without floating point.
+	// Wider than the screen -> width is the limiting dimension.
+	// Taller/narrower       -> height is the limiting dimension.
+	if ((long long)converted->w * screen->h > (long long)converted->h * screen->w) {
+		target_w = screen->w;
+		target_h = converted->h * screen->w / converted->w;
+	}
+	else {
+		target_h = screen->h;
+		target_w = converted->w * screen->h / converted->h;
+	}
+
+	if (target_w < 1) target_w = 1;
+	if (target_h < 1) target_h = 1;
+
+	SDL_Surface* scaled = SDL_CreateRGBSurface(
+		SDL_SWSURFACE,
+		target_w,
+		target_h,
+		screen->format->BitsPerPixel,
+		screen->format->Rmask,
+		screen->format->Gmask,
+		screen->format->Bmask,
+		screen->format->Amask
+	);
+
+	if (scaled == NULL) {
+		SDL_FreeSurface(converted);
+		return;
+	}
+
+	if (SDL_SoftStretch(converted, NULL, scaled, NULL) != 0) {
+		SDL_FreeSurface(converted);
+		SDL_FreeSurface(scaled);
+		return;
+	}
+
+	SDL_FreeSurface(converted);
+	preview_surface = scaled;
+}
+
+static void drawPreview(void) {
+	if (!previews_enabled || preview_surface == NULL) return;
+
+	// The preview is deliberately rendered after every other MinUI element.
+	// It therefore sits in the foreground and hides text/chrome only where the
+	// image itself exists. Any unused side/top/bottom area still shows MinUI.
+	SDL_Rect dst = {
+		(screen->w - preview_surface->w) / 2,
+		(screen->h - preview_surface->h) / 2,
+		0,
+		0
+	};
+
+	SDL_BlitSurface(preview_surface, NULL, screen, &dst);
+}
+
+static void togglePreviews(void) {
+	previews_enabled = !previews_enabled;
+
+	// Free RAM immediately when disabled. When enabling, clearing the remembered
+	// path forces the currently selected entry to be loaded on the next redraw.
+	clearPreview();
+}
+
 #define kMaxRows 5
 
 ///////////////////////////////////////
@@ -2204,6 +2388,13 @@ int main(void) {
 			is_dirty = 1;
 		}
 
+		// Preview visibility is a session-only setting. Start + Right toggles it
+		// without creating/updating any file on the SD card.
+		if (Input_isPressed(kButtonStart) && Input_justPressed(kButtonRight)) {
+			togglePreviews();
+			is_dirty = 1;
+		}
+
 		if (!Input_isPressed(kButtonSelect)) {
 			if (!Input_isPressed(kButtonStart) && Input_justRepeated(kButtonUp)) {
 				selected -= 1;
@@ -2243,7 +2434,7 @@ int main(void) {
 					top->end = top->start + kMaxRows;
 				}
 			}
-			else if (Input_justRepeated(kButtonRight)) {
+			else if (!Input_isPressed(kButtonStart) && Input_justRepeated(kButtonRight)) {
 				selected += kMaxRows;
 				if (selected>=total) {
 					selected = total-1;
@@ -2369,6 +2560,16 @@ int main(void) {
 		#define kMaxTextWidth 288 // 320-32
 		if (is_dirty) {
 			needs_scrolling = 0;
+
+			// Preview lookup is tied to the currently selected real Entry.path.
+			// updatePreview() does nothing when the same entry is redrawn, so changes
+			// such as battery/settings updates never reload the PNG unnecessarily.
+			if (top->entries->count > 0) {
+				updatePreview(top->entries->items[top->selected]);
+			}
+			else {
+				updatePreview(NULL);
+			}
 			
 			// clear
 			SDL_FillRect(screen, NULL, 0);
@@ -2503,6 +2704,10 @@ int main(void) {
 				
 				y += 32;
 			}
+
+			// Foreground preview: render it only after every MinUI element so the
+			// image always stays visually above the menu, text and status bars.
+			drawPreview();
 			
 			SDL_Flip(screen);
 			is_dirty = 0;
@@ -2548,6 +2753,11 @@ int main(void) {
 				text = TTF_RenderUTF8_Blended(font, name, color);
 				SDL_BlitSurface(text, &(SDL_Rect){scroll_ox,0,kMaxTextWidth,text->h}, screen, &(SDL_Rect){16,38+y+6,kMaxTextWidth,text->h});
 				SDL_FreeSurface(text);
+
+				// The scrolling row is redrawn every frame, so re-blit the already-scaled
+				// preview afterwards to keep it in the foreground. This is only a blit;
+				// the expensive PNG load/scale happened once in updatePreview().
+				drawPreview();
 				SDL_Flip(screen); // TODO: just update the modified rect?
 			}
 			else {
@@ -2571,6 +2781,9 @@ int main(void) {
 	// one last wipe
 	SDL_FillRect(screen, NULL, 0);
 	SDL_Flip(screen);
+
+	// Release the optional preview surface before shutting SDL down.
+	clearPreview();
 	
 	Menu_quit();
 	
