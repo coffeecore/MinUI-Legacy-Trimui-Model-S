@@ -1387,10 +1387,22 @@ static int previews_enabled = 0;
 // Keep only one already-scaled preview in memory. The Model S is small enough
 // that caching several full images would cost RAM for very little benefit.
 //
-// preview_entry_path is also remembered when no PNG exists. That prevents
-// repeated filesystem lookups every time the same menu entry is redrawn.
+// preview_entry_path remembers the entry whose PNG has already been loaded or
+// checked. Remembering missing previews is important too: it prevents repeated
+// filesystem lookups while the same ROM stays selected.
 static SDL_Surface* preview_surface = NULL;
 static char preview_entry_path[256] = "";
+
+// Do not touch the SD card immediately when the selection changes. A user can
+// move through many ROMs very quickly, and loading every intermediate PNG would
+// only create unnecessary reads and image decoding work.
+//
+// preview_candidate_path is the entry currently waiting for a preview lookup.
+// The path must remain selected for kPreviewDelay milliseconds before IMG_Load()
+// is allowed to access its PNG.
+#define kPreviewDelay 300
+static char preview_candidate_path[256] = "";
+static unsigned long preview_candidate_since = 0;
 
 static void clearPreview(void) {
 	if (preview_surface != NULL) {
@@ -1399,6 +1411,8 @@ static void clearPreview(void) {
 	}
 
 	preview_entry_path[0] = '\0';
+	preview_candidate_path[0] = '\0';
+	preview_candidate_since = 0;
 }
 
 // Build the preview path from the real ROM path, never from Entry.name.
@@ -1450,7 +1464,12 @@ static int getPreviewPath(Entry* entry, char* preview_path, size_t size) {
 	return written > 0 && (size_t)written < size;
 }
 
-// Load and scale a preview only when the selected real path changes.
+// Load and scale a preview only after the selected real path has remained stable
+// for kPreviewDelay milliseconds.
+//
+// The delay is intentionally handled before getPreviewPath()/IMG_Load(), so fast
+// navigation through a ROM list performs no preview filesystem reads at all for
+// entries that are selected for less than 0.3 seconds.
 //
 // The image uses a "contain" fit: it is made as large as possible while
 // remaining entirely inside the 320x240 screen. Its aspect ratio is preserved,
@@ -1458,38 +1477,68 @@ static int getPreviewPath(Entry* entry, char* preview_path, size_t size) {
 // leave MinUI visible above/below. Nothing is cropped or distorted.
 //
 // Scaling happens once here. Rendering later is therefore only a cheap blit.
-static void updatePreview(Entry* entry) {
-	if (!previews_enabled) {
+//
+// Return 1 when the visible preview changed and MinUI should redraw the screen.
+static int updatePreview(Entry* entry, unsigned long now) {
+	if (!previews_enabled || entry == NULL) {
+		int changed = preview_surface != NULL;
 		clearPreview();
-		return;
+		return changed;
 	}
 
-	if (entry == NULL) {
-		clearPreview();
-		return;
+	// This exact entry has already been processed. That includes the case where
+	// its PNG does not exist, so there is nothing more to do until selection changes.
+	if (preview_entry_path[0] != '\0' && exact_match(preview_entry_path, entry->path)) {
+		return 0;
 	}
 
-	if (exact_match(preview_entry_path, entry->path)) return;
+	// A new selection starts (or restarts) the 0.3 second timer. Remove the old
+	// preview immediately so an image belonging to the previous ROM is never shown
+	// while waiting for the new selection to settle.
+	if (
+		preview_candidate_path[0] == '\0' ||
+		!exact_match(preview_candidate_path, entry->path)
+	) {
+		int changed = preview_surface != NULL;
 
-	// Selection changed: discard the previous image first, then remember this
-	// entry even when no PNG exists so we do not keep probing the SD card.
-	if (preview_surface != NULL) {
-		SDL_FreeSurface(preview_surface);
-		preview_surface = NULL;
+		if (preview_surface != NULL) {
+			SDL_FreeSurface(preview_surface);
+			preview_surface = NULL;
+		}
+
+		preview_entry_path[0] = '\0';
+		snprintf(
+			preview_candidate_path,
+			sizeof(preview_candidate_path),
+			"%s",
+			entry->path
+		);
+		preview_candidate_since = now;
+
+		return changed;
 	}
+
+	// The selection is still inside the grace period: keep MinUI visible and, most
+	// importantly, do not build/probe/load the preview path yet.
+	if (now - preview_candidate_since < kPreviewDelay) return 0;
+
+	// The entry survived the delay. Mark it as processed before touching the PNG
+	// so a missing/invalid image is also remembered and is not retried every frame.
 	snprintf(preview_entry_path, sizeof(preview_entry_path), "%s", entry->path);
+	preview_candidate_path[0] = '\0';
+	preview_candidate_since = 0;
 
 	char preview_path[256];
-	if (!getPreviewPath(entry, preview_path, sizeof(preview_path))) return;
+	if (!getPreviewPath(entry, preview_path, sizeof(preview_path))) return 0;
 
 	SDL_Surface* loaded = IMG_Load(preview_path);
-	if (loaded == NULL) return;
+	if (loaded == NULL) return 0;
 
 	// Convert to the current display format before stretching. SDL_SoftStretch
 	// works best when source and destination use the same pixel format.
 	SDL_Surface* converted = SDL_DisplayFormat(loaded);
 	SDL_FreeSurface(loaded);
-	if (converted == NULL) return;
+	if (converted == NULL) return 0;
 
 	int target_w;
 	int target_h;
@@ -1522,17 +1571,18 @@ static void updatePreview(Entry* entry) {
 
 	if (scaled == NULL) {
 		SDL_FreeSurface(converted);
-		return;
+		return 0;
 	}
 
 	if (SDL_SoftStretch(converted, NULL, scaled, NULL) != 0) {
 		SDL_FreeSurface(converted);
 		SDL_FreeSurface(scaled);
-		return;
+		return 0;
 	}
 
 	SDL_FreeSurface(converted);
 	preview_surface = scaled;
+	return 1;
 }
 
 static void drawPreview(void) {
@@ -2509,6 +2559,19 @@ int main(void) {
 		}
 		
 		unsigned long now = SDL_GetTicks();
+
+		// Preview loading has its own 0.3 second selection-stability timer. This
+		// check runs every frame because the delay can expire while there is no new
+		// input event. updatePreview() touches the SD card only after that delay.
+		Entry* preview_entry = NULL;
+		if (top->entries->count > 0) {
+			preview_entry = top->entries->items[top->selected];
+		}
+
+		if (updatePreview(preview_entry, now)) {
+			is_dirty = 1;
+		}
+
 		#define kScrollPauseDelay 750
 		if (cancel_wait) {
 			// Any user interaction restarts the selected label from its beginning.
@@ -2560,16 +2623,6 @@ int main(void) {
 		#define kMaxTextWidth 288 // 320-32
 		if (is_dirty) {
 			needs_scrolling = 0;
-
-			// Preview lookup is tied to the currently selected real Entry.path.
-			// updatePreview() does nothing when the same entry is redrawn, so changes
-			// such as battery/settings updates never reload the PNG unnecessarily.
-			if (top->entries->count > 0) {
-				updatePreview(top->entries->items[top->selected]);
-			}
-			else {
-				updatePreview(NULL);
-			}
 			
 			// clear
 			SDL_FillRect(screen, NULL, 0);
