@@ -9,6 +9,25 @@
 
 SD=/mnt/SDCARD
 
+LOG_DIR="$SD/.minui/logs"
+DISABLE_LOGS="$SD/.minui/disable-logs"
+
+logs_are_tmpfs() {
+	awk -v dir="$LOG_DIR" '$2 == dir && $3 == "tmpfs" { found = 1 } END { exit !found }' /proc/mounts
+}
+
+setup_logs() {
+	mkdir -p "$LOG_DIR"
+
+	if [ -f "$DISABLE_LOGS" ]; then
+		if ! logs_are_tmpfs; then
+			mount -t tmpfs -o size=1m tmpfs "$LOG_DIR"
+		fi
+	elif logs_are_tmpfs; then
+		umount "$LOG_DIR"
+	fi
+}
+
 UPDATE_LOG="$SD/update.log"
 UPDATE_ZIP="$SD/TrimuiUpdate_MinUI.zip"
 UPDATE_TMP="$SD/.tmp_update"
@@ -40,7 +59,7 @@ sync
 
 while [ -f /tmp/minui_exec ]; do
 	# these can be deleted with Commander.pak so make sure they exist
-	mkdir -p "$SD/.minui/logs"
+	setup_logs
 	mkdir -p "$SD/.minui/screenshots"
 	
 	./MinUI &> "$SD/.minui/logs/MinUI.txt"
