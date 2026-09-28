@@ -57,6 +57,22 @@ fi
 touch /tmp/minui_exec
 sync
 
+FAKE_RTC_FILE="$SD/.minui/fake-rtc"
+FAKE_RTC_INITIAL=946684800
+FAKE_RTC_BOOT_OFFSET=14400
+
+if [ -f "$FAKE_RTC_FILE" ]; then
+    FAKE_RTC=$(cat "$FAKE_RTC_FILE")
+    FAKE_RTC=$((FAKE_RTC + FAKE_RTC_BOOT_OFFSET))
+else
+    FAKE_RTC=$FAKE_RTC_INITIAL
+fi
+
+date -s "@$FAKE_RTC"
+
+date +%s > "$FAKE_RTC_FILE"
+sync
+
 while [ -f /tmp/minui_exec ]; do
 	# these can be deleted with Commander.pak so make sure they exist
 	setup_logs
@@ -70,6 +86,8 @@ while [ -f /tmp/minui_exec ]; do
 		CMD=`cat $NEXT`
 		rm -f $NEXT
 		eval $CMD
+
+		date +%s > "$FAKE_RTC_FILE"
 		
 		if [ -f /tmp/using-swap ]; then
 			rm -f /tmp/using-swap

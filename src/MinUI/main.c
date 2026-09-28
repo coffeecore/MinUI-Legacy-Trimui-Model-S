@@ -17,6 +17,8 @@
 #include <sys/mman.h>
 #include <msettings.h>
 
+#include <time.h>
+
 ///////////////////////////////////////
 
 #define kRootDir "/mnt/SDCARD"
@@ -205,6 +207,15 @@ static int index_char(char* str) {
 	char c = tolower(str[0]);
 	if (c>='a' && c<='z') i = (c-'a')+1;
 	return i;
+}
+
+static void saveFakeRtc(void) {
+	FILE* file = fopen("/mnt/SDCARD/.minui/fake-rtc", "w");
+	if (!file) return;
+
+	fprintf(file, "%ld\n", (long)time(NULL));
+	fclose(file);
+	sync();
 }
 
 ///////////////////////////////////////
@@ -1683,6 +1694,7 @@ static void waitForWakeCombo(void) {
 }
 
 static void fauxSleep(void) {
+	saveFakeRtc();
 	SetRawVolume(0);
 	SetRawBrightness(0);
 	setCPU(kCPUDead);
@@ -1690,6 +1702,8 @@ static void fauxSleep(void) {
 	system("killall -s STOP keymon");
 	
 	waitForWakeCombo();
+
+	saveFakeRtc();
 	
 	system("killall -s CONT keymon");
 
