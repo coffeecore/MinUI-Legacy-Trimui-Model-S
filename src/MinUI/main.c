@@ -1337,6 +1337,7 @@ static void Input_beforePoll(void) {
 	for (int i=0; i<kButtonCount; i++) {
 		buttons[i].justPressed = 0;
 		buttons[i].justRepeated = 0;
+		buttons[i].justReleased = 0;
 	}
 }
 static void Input_reset(void) {
@@ -1344,6 +1345,7 @@ static void Input_reset(void) {
 		buttons[i].justPressed = 0;
 		buttons[i].isPressed = 0;
 		buttons[i].justRepeated = 0;
+		buttons[i].justReleased = 0;
 	}
 }
 #define Input_justPressed(btn) buttons[(btn)].justPressed
@@ -2382,6 +2384,7 @@ int main(void) {
 	SDL_Event event;
 	int is_dirty = 1;
 	int show_setting = 0; // 1=brightness,2=volume
+	int start_used = 0;
 	int setting_value = 0;
 	int setting_max = 0;
 	int needs_scrolling = 0;
@@ -2433,14 +2436,19 @@ int main(void) {
 		int selected = top->selected;
 		int total = top->entries->count;
 
+		if (Input_justPressed(kButtonStart)) {
+			start_used = 0;
+		}
+
 		if (Input_isPressed(kButtonStart) && Input_justPressed(kButtonUp)) {
+			start_used = 1;
 			toggle_emulator_preference();
 			is_dirty = 1;
 		}
 
-		// Preview visibility is a session-only setting. Start + Right toggles it
-		// without creating/updating any file on the SD card.
-		if (Input_isPressed(kButtonStart) && Input_justPressed(kButtonRight)) {
+		// Preview visibility is a session-only setting.
+		// Pressing Start alone toggles it without writing anything to the SD card.
+		if (Input_justReleased(kButtonStart) && !start_used) {
 			togglePreviews();
 			is_dirty = 1;
 		}
