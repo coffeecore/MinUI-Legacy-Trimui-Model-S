@@ -18,7 +18,7 @@
 	url = git@github.com:shauninman/gpsp-bittboy.git
 [submodule "src/libmmenu"]
 	path = src/libmmenu
-	url = git@github.com:shauninman/libmmenu.git
+	url = git@github.com:coffeecore/libmmenu.git
 [submodule "third-party/snes9x2002"]
 	path = third-party/snes9x2002
 	url = git@github.com:shauninman/snes9x2002.git
