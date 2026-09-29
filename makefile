@@ -146,7 +146,7 @@ lynx: emu
 	cp "third-party/handy-rs97/handy" "$(PAYLOAD_PATH)/Emus/Lynx.pak"
 
 #--------------------------------------
-tools: bridge commander reload stock tips # zero
+tools: bridge commander reload stock tips clock # zero
 #--------------------------------------
 
 tool:
@@ -173,6 +173,11 @@ reload: tool
 tips: tool
 	cp -R "paks/Tips.pak" "$(PAYLOAD_PATH)/Tools"
 
+clock: tool
+	cd ./src/clock && make
+	cp -R "paks/Clock.pak" "$(PAYLOAD_PATH)/Tools"
+	cp "src/clock/clock" "$(PAYLOAD_PATH)/Tools/Clock.pak"
+
 zero: tool
 	cp -R "paks/Zero Stock.pak" "$(PAYLOAD_PATH)/Tools"
 
@@ -193,7 +198,7 @@ clean-sys:
 	cd ./src/confirm && make clean
 	cd ./src/flipbook && make clean
 	cd ./TrimuiUpdate/ && make clean
-	
+
 clean: clean-sys
 	cd ./third-party/SDL-1.2 && make distclean
 	cd ./third-party/DinguxCommander && make clean
@@ -208,4 +213,5 @@ clean: clean-sys
 	cd ./third-party/picodrive && make clean
 	cd ./third-party/temper/SDL && make clean
 	cd ./third-party/oswan && make clean
+	cd ./src/clock && make clean
 	rm -rf ./build
