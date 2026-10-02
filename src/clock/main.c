@@ -126,8 +126,10 @@ static void drawClock(
 	SDL_Surface* screen,
 	TTF_Font* font,
 	TTF_Font* small,
+	TTF_Font* button_font,
 	SDL_Surface* title_bar,
 	SDL_Surface* bottom_bar,
+	SDL_Surface* round_button,
 	const ClockTime* clock,
 	int selected
 ) {
@@ -211,11 +213,59 @@ static void drawClock(
 		}
 	}
 
-	drawText(screen, small, "B  CANCEL", 16, 211, white);
+	SDL_Color button_gold = {0x9f, 0x89, 0x52};
 
-	const char* save = "A  SAVE";
-	int save_width = textWidth(small, save);
-	drawText(screen, small, save, SCREEN_WIDTH - save_width - 16, 211, white);
+	// B Cancel
+	SDL_BlitSurface(
+		round_button,
+		NULL,
+		screen,
+		&(SDL_Rect){10, 210, 0, 0}
+	);
+
+	drawText(
+		screen,
+		button_font,
+		"B",
+		17,
+		211,
+		button_gold
+	);
+
+	drawText(
+		screen,
+		small,
+		"CANCEL",
+		35,
+		212,
+		white
+	);
+
+	// A Save
+	SDL_BlitSurface(
+		round_button,
+		NULL,
+		screen,
+		&(SDL_Rect){251, 210, 0, 0}
+	);
+
+	drawText(
+		screen,
+		button_font,
+		"A",
+		257,
+		211,
+		button_gold
+	);
+
+	drawText(
+		screen,
+		small,
+		"SAVE",
+		276,
+		212,
+		white
+	);
 
 	SDL_Flip(screen);
 }
@@ -278,11 +328,13 @@ int main(void) {
 
 	TTF_Font* font = TTF_OpenFont(RES_PATH "BPreplayBold.otf", 24);
 	TTF_Font* small = TTF_OpenFont(RES_PATH "BPreplayBold.otf", 14);
+	TTF_Font* button_font = TTF_OpenFont(RES_PATH "BPreplayBold.otf", 16);
 
 	SDL_Surface* title_bar = IMG_Load(RES_PATH "title-bg.png");
 	SDL_Surface* bottom_bar = IMG_Load(RES_PATH "tips-bar-bg.png");
+	SDL_Surface* round_button = IMG_Load(RES_PATH "nav-bar-item-bg.png");
 
-	if (!font || !small) {
+	if (!font || !small || !button_font) {
 		puts(TTF_GetError());
 		return EXIT_FAILURE;
 	}
@@ -352,8 +404,10 @@ int main(void) {
 				screen,
 				font,
 				small,
+				button_font,
 				title_bar,
 				bottom_bar,
+				round_button,
 				&clock,
 				selected
 			);
@@ -370,9 +424,11 @@ int main(void) {
 
 	SDL_FreeSurface(title_bar);
 	SDL_FreeSurface(bottom_bar);
+	SDL_FreeSurface(round_button);
 
 	TTF_CloseFont(font);
 	TTF_CloseFont(small);
+	TTF_CloseFont(button_font);
 
 	TTF_Quit();
 	SDL_Quit();
