@@ -52,7 +52,7 @@ sys: lib
 	cp "third-party/SDL-1.2/build/.libs/libSDL-1.2.so.0.11.5" "$(PAYLOAD_PATH)/System/lib/libSDL-1.2.so.0"
 
 #--------------------------------------
-emus: gb pm ngp gg snes ps gba nes gen pce swan lynx
+emus: gb pm ngp gg snes ps gba nes gen pce swan lynx gx4000
 #--------------------------------------
 
 emu:
@@ -145,6 +145,12 @@ lynx: emu
 	cp -R "paks/Lynx.pak" "$(PAYLOAD_PATH)/Emus"
 	cp "third-party/handy-rs97/handy" "$(PAYLOAD_PATH)/Emus/Lynx.pak"
 
+gx4000: lib emu
+	mkdir -p "$(ROMS_PATH)/GX4000"
+	cd ./third-party/arnold && make -j
+	cp -R "paks/GX4000.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/arnold/arnold" "$(PAYLOAD_PATH)/Emus/GX4000.pak/arnold"
+
 #--------------------------------------
 tools: bridge commander reload stock tips clock # zero
 #--------------------------------------
@@ -213,5 +219,7 @@ clean: clean-sys
 	cd ./third-party/picodrive && make clean
 	cd ./third-party/temper/SDL && make clean
 	cd ./third-party/oswan && make clean
+	cd ./third-party/arnold && make clean
+	rm -f ./third-party/arnold/arnold
 	cd ./src/clock && make clean
 	rm -rf ./build

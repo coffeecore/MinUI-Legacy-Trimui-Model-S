@@ -49,3 +49,6 @@
 [submodule "src/libmsettings"]
 	path = src/libmsettings
 	url = git@github.com:shauninman/libmsettings.git
+[submodule "third-party/arnold"]
+	path = third-party/arnold
+	url = https://github.com/coffeecore/arnold_gcw0.git
