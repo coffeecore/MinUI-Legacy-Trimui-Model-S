@@ -52,3 +52,6 @@
 [submodule "third-party/arnold"]
 	path = third-party/arnold
 	url = https://github.com/coffeecore/arnold_gcw0.git
+[submodule "third-party/stella"]
+	path = third-party/stella
+	url = https://github.com/coffeecore/Stella-3.9.3.git

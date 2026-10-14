@@ -52,7 +52,9 @@ sys: lib
 	cp "third-party/SDL-1.2/build/.libs/libSDL-1.2.so.0.11.5" "$(PAYLOAD_PATH)/System/lib/libSDL-1.2.so.0"
 
 #--------------------------------------
-emus: gb pm ngp gg snes ps gba nes gen pce swan lynx gx4000
+emus: gb pm ngp gg snes ps gba nes gen pce swan lynx standalone-emus
+
+standalone-emus: gx4000 stella
 #--------------------------------------
 
 emu:
@@ -151,6 +153,17 @@ gx4000: lib emu
 	cp -R "paks/GX4000.pak" "$(PAYLOAD_PATH)/Emus"
 	cp "third-party/arnold/arnold" "$(PAYLOAD_PATH)/Emus/GX4000.pak/arnold"
 
+stella: emu
+	mkdir -p "$(ROMS_PATH)/Atari 2600"
+	test -f "$(SYSROOT)/usr/lib/libSDL.a"
+	test -f "$(SYSROOT)/usr/lib/libpng.a"
+	cp "configs/stella.mak" "third-party/stella/config.mak"
+	cd ./third-party/stella && $(MAKE) -j \
+		CROSS_COMPILE="$(CROSS_COMPILE)" \
+		SYSROOT="$(SYSROOT)"
+	cp -R "paks/Atari 2600.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/stella/stella" "$(PAYLOAD_PATH)/Emus/Atari 2600.pak/stella"
+
 #--------------------------------------
 tools: bridge commander reload stock tips clock # zero
 #--------------------------------------
@@ -221,5 +234,10 @@ clean: clean-sys
 	cd ./third-party/oswan && make clean
 	cd ./third-party/arnold && make clean
 	rm -f ./third-party/arnold/arnold
+	@if [ -f ./third-party/stella/config.mak ]; then \
+		cd ./third-party/stella && $(MAKE) clean; \
+	fi
+	rm -f ./third-party/stella/config.mak
+	rm -f ./third-party/stella/stella
 	cd ./src/clock && make clean
 	rm -rf ./build
