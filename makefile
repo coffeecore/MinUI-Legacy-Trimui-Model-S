@@ -54,7 +54,7 @@ sys: lib
 #--------------------------------------
 emus: gb pm ngp gg snes ps gba nes gen pce swan lynx standalone-emus
 
-standalone-emus: gx4000 stella
+standalone-emus: gx4000 stella retro8
 #--------------------------------------
 
 emu:
@@ -164,6 +164,12 @@ stella: emu
 	cp -R "paks/Atari 2600.pak" "$(PAYLOAD_PATH)/Emus"
 	cp "third-party/stella/stella" "$(PAYLOAD_PATH)/Emus/Atari 2600.pak/stella"
 
+retro8: emu
+	mkdir -p "$(ROMS_PATH)/PICO-8"
+	cd ./third-party/retro8 && $(MAKE) -j
+	cp -R "paks/PICO-8.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/retro8/retro8" "$(PAYLOAD_PATH)/Emus/PICO-8.pak/retro8"
+
 #--------------------------------------
 tools: bridge commander reload stock tips clock # zero
 #--------------------------------------
@@ -239,5 +245,6 @@ clean: clean-sys
 	fi
 	rm -f ./third-party/stella/config.mak
 	rm -f ./third-party/stella/stella
+	cd ./third-party/retro8 && $(MAKE) clean
 	cd ./src/clock && make clean
 	rm -rf ./build

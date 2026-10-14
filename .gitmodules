@@ -55,3 +55,6 @@
 [submodule "third-party/stella"]
 	path = third-party/stella
 	url = https://github.com/coffeecore/Stella-3.9.3.git
+[submodule "third-party/retro8"]
+	path = third-party/retro8
+	url = https://github.com/coffeecore/retro8.git
