@@ -11,6 +11,9 @@ BUILD_PATH=./build
 PAYLOAD_PATH=$(BUILD_PATH)/PAYLOAD
 ROMS_PATH=$(BUILD_PATH)/Roms
 
+CROSS_COMPILE ?= /opt/trimui-toolchain/bin/arm-buildroot-linux-gnueabi-
+SYSROOT ?= /opt/trimui-toolchain/arm-buildroot-linux-gnueabi/sysroot
+
 #--------------------------------------
 all: readme sys emus tools zip
 #--------------------------------------
@@ -54,7 +57,7 @@ sys: lib
 #--------------------------------------
 emus: gb pm ngp gg snes ps gba nes gen pce swan lynx standalone-emus
 
-standalone-emus: gx4000 stella retro8
+standalone-emus: gx4000 stella retro8 gngeo
 #--------------------------------------
 
 emu:
@@ -170,6 +173,26 @@ retro8: emu
 	cp -R "paks/PICO-8.pak" "$(PAYLOAD_PATH)/Emus"
 	cp "third-party/retro8/retro8" "$(PAYLOAD_PATH)/Emus/PICO-8.pak/retro8"
 
+gngeo: lib emu
+	mkdir -p "$(ROMS_PATH)/Neo Geo"
+	test -f "$(SYSROOT)/usr/lib/libts-1.0.so.0"
+	test -f "$(SYSROOT)/usr/lib/libz.so.1"
+	cd ./third-party/gngeo && $(MAKE) -f Makefile.trimui \
+		CROSS_COMPILE="$(CROSS_COMPILE)" \
+		SYSROOT="$(SYSROOT)" \
+		MMENU_DIR="$(CURDIR)/src/libmmenu"
+	cp -R "paks/Neo Geo.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/gngeo/gngeo" "$(PAYLOAD_PATH)/Emus/Neo Geo.pak/gngeo"
+	mkdir -p "$(PAYLOAD_PATH)/Emus/Neo Geo.pak/lib"
+	cp -L $(SYSROOT)/usr/lib/libts-1.0.so* \
+		"$(PAYLOAD_PATH)/Emus/Neo Geo.pak/lib/"
+	cp -L "$(SYSROOT)/usr/lib/libz.so.1" \
+		"$(PAYLOAD_PATH)/Emus/Neo Geo.pak/lib/libz.so.1"
+	@if [ -d "$(SYSROOT)/usr/lib/ts" ]; then \
+		cp -aL "$(SYSROOT)/usr/lib/ts" \
+			"$(PAYLOAD_PATH)/Emus/Neo Geo.pak/lib/"; \
+	fi
+
 #--------------------------------------
 tools: bridge commander reload stock tips clock # zero
 #--------------------------------------
@@ -246,5 +269,8 @@ clean: clean-sys
 	rm -f ./third-party/stella/config.mak
 	rm -f ./third-party/stella/stella
 	cd ./third-party/retro8 && $(MAKE) clean
+	@if [ -f ./third-party/gngeo/Makefile.trimui ]; then \
+		cd ./third-party/gngeo && $(MAKE) -f Makefile.trimui clean; \
+	fi
 	cd ./src/clock && make clean
 	rm -rf ./build

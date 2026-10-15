@@ -58,3 +58,6 @@
 [submodule "third-party/retro8"]
 	path = third-party/retro8
 	url = https://github.com/coffeecore/retro8.git
+[submodule "third-party/gngeo"]
+	path = third-party/gngeo
+	url = https://github.com/coffeecore/gngeo-steward-fu.git
