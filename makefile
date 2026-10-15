@@ -707,6 +707,40 @@ picoarch-clean-validated: \
 	picoarch-clean-stella2014 \
 	picoarch-clean-mame2003
 
+.PHONY: picoarch-output
+
+picoarch-output: picoarch-validated picoarch-frontend
+	test -n "$(PICOARCH_OUTPUT)"
+	test -x "$(PICOARCH_BUILD)/picoarch"
+
+	@test "$$(find "$(PICOARCH_BUILD)" \
+		-maxdepth 1 \
+		-type f \
+		-name '*_libretro.so' \
+		| wc -l)" -eq 21 || { \
+		echo "ERROR: expected 21 validated PicoArch cores in $(PICOARCH_BUILD)" >&2; \
+		exit 1; \
+	}
+
+	rm -rf "$(PICOARCH_OUTPUT)"
+	mkdir -p "$(PICOARCH_OUTPUT)/cores"
+
+	cp \
+		"$(PICOARCH_BUILD)/picoarch" \
+		"$(PICOARCH_OUTPUT)/picoarch"
+
+	find "$(PICOARCH_BUILD)" \
+		-maxdepth 1 \
+		-type f \
+		-name '*_libretro.so' \
+		-exec cp {} "$(PICOARCH_OUTPUT)/cores/" \;
+
+.PHONY: picoarch-clean-output
+
+picoarch-clean-output:
+	test -n "$(PICOARCH_OUTPUT)"
+	rm -rf "$(PICOARCH_OUTPUT)"
+
 
 clean-sys:
 	cd ./src/libmmenu && make clean
