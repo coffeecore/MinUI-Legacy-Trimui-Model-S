@@ -14,6 +14,8 @@ BUILD_PATH=./build
 PAYLOAD_PATH=$(BUILD_PATH)/PAYLOAD
 ROMS_PATH=$(BUILD_PATH)/Roms
 
+PICOARCH_SOURCE := $(CURDIR)/third-party/picoarch
+
 CROSS_COMPILE ?= /opt/trimui-toolchain/bin/arm-buildroot-linux-gnueabi-
 SYSROOT ?= /opt/trimui-toolchain/arm-buildroot-linux-gnueabi/sysroot
 
@@ -282,6 +284,23 @@ picoarch-frontend:
 		picoarch
 
 	test -x "$(PICOARCH_BUILD)/picoarch"
+
+.PHONY: picoarch-prepare
+
+picoarch-prepare:
+	test -n "$(PICOARCH_BUILD)"
+	test -f "$(PICOARCH_SOURCE)/Makefile"
+
+	@REV="$$(git -C "$(PICOARCH_SOURCE)" rev-parse HEAD)"; \
+	STAMP="$(PICOARCH_BUILD)/.prepared"; \
+	if [ ! -f "$$STAMP" ] || \
+	   [ "$$(cat "$$STAMP" 2>/dev/null)" != "$$REV" ]; then \
+		echo "Preparing PicoArch $$REV"; \
+		rm -rf "$(PICOARCH_BUILD)"; \
+		mkdir -p "$(dir $(PICOARCH_BUILD))"; \
+		cp -a "$(PICOARCH_SOURCE)" "$(PICOARCH_BUILD)"; \
+		echo "$$REV" > "$$STAMP"; \
+	fi
 
 clean-sys:
 	cd ./src/libmmenu && make clean

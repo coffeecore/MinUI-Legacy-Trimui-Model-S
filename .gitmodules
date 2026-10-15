@@ -61,3 +61,6 @@
 [submodule "third-party/gngeo"]
 	path = third-party/gngeo
 	url = https://github.com/coffeecore/gngeo-steward-fu.git
+[submodule "third-party/picoarch"]
+	path = third-party/picoarch
+	url = https://github.com/coffeecore/picoarch.git
