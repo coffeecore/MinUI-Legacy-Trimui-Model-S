@@ -15,6 +15,12 @@ PAYLOAD_PATH=$(BUILD_PATH)/PAYLOAD
 ROMS_PATH=$(BUILD_PATH)/Roms
 
 PICOARCH_SOURCE := $(CURDIR)/third-party/picoarch
+PICOARCH_MAKE_ARGS := \
+	platform=trimui \
+	CROSS_COMPILE=$(CROSS_COMPILE) \
+	CXX=$(CROSS_COMPILE)g++ \
+	CC_FOR_BUILD=gcc \
+	CXX_FOR_BUILD=g++
 
 CROSS_COMPILE ?= /opt/trimui-toolchain/bin/arm-buildroot-linux-gnueabi-
 SYSROOT ?= /opt/trimui-toolchain/arm-buildroot-linux-gnueabi/sysroot
@@ -301,6 +307,406 @@ picoarch-prepare:
 		cp -a "$(PICOARCH_SOURCE)" "$(PICOARCH_BUILD)"; \
 		echo "$$REV" > "$$STAMP"; \
 	fi
+
+# -----------------------------------------------------------------------------
+# Groups
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-validated
+picoarch-validated: picoarch-prepare \
+	picoarch-fceumm \
+	picoarch-gambatte \
+	picoarch-gngeo \
+	picoarch-gpsp \
+	picoarch-handy \
+	picoarch-picodrive \
+	picoarch-mame2000 \
+	picoarch-pcsx-rearmed \
+	picoarch-beetle-pce-fast \
+	picoarch-bluemsx \
+	picoarch-fmsx \
+	picoarch-gme \
+	picoarch-mednafen-ngp \
+	picoarch-mednafen-wswan \
+	picoarch-pokemini \
+	picoarch-quicknes \
+	picoarch-smsplus-gx \
+	picoarch-snes9x2002 \
+	picoarch-snes9x2005 \
+	picoarch-stella2014 \
+	picoarch-mame2003
+
+
+# -----------------------------------------------------------------------------
+# FCEUmm
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-fceumm
+picoarch-fceumm: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		fceumm_libretro.so
+
+.PHONY: picoarch-clean-fceumm
+picoarch-clean-fceumm: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-fceumm
+
+# -----------------------------------------------------------------------------
+# Gambatte
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-gambatte
+picoarch-gambatte: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		gambatte_libretro.so
+
+.PHONY: picoarch-clean-gambatte
+picoarch-clean-gambatte: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-gambatte
+
+# -----------------------------------------------------------------------------
+# gpSP
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-gpsp
+picoarch-gpsp: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		gpsp_libretro.so
+
+.PHONY: picoarch-clean-gpsp
+picoarch-clean-gpsp: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-gpsp
+
+
+# -----------------------------------------------------------------------------
+# PicoDrive
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-picodrive
+picoarch-picodrive: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		picodrive_libretro.so
+
+.PHONY: picoarch-clean-picodrive
+picoarch-clean-picodrive: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-picodrive
+
+
+# -----------------------------------------------------------------------------
+# MAME 2000
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-mame2000
+picoarch-mame2000: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		mame2000_libretro.so
+
+.PHONY: picoarch-clean-mame2000
+picoarch-clean-mame2000: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-mame2000
+
+# -----------------------------------------------------------------------------
+# MAME 2003
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-mame2003
+picoarch-mame2003: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		mame2003_libretro.so
+
+.PHONY: picoarch-clean-mame2003
+picoarch-clean-mame2003: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-mame2003
+
+# -----------------------------------------------------------------------------
+# PCSX-ReARMed
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-pcsx-rearmed
+picoarch-pcsx-rearmed: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		pcsx_rearmed_libretro.so
+
+.PHONY: picoarch-clean-pcsx-rearmed
+picoarch-clean-pcsx-rearmed: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-pcsx_rearmed
+
+
+# -----------------------------------------------------------------------------
+# Beetle PCE Fast
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-beetle-pce-fast
+picoarch-beetle-pce-fast: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		beetle-pce-fast_libretro.so
+
+.PHONY: picoarch-clean-beetle-pce-fast
+picoarch-clean-beetle-pce-fast: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-beetle-pce-fast
+
+# -----------------------------------------------------------------------------
+# blueMSX
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-bluemsx
+picoarch-bluemsx: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		bluemsx_libretro.so
+
+.PHONY: picoarch-clean-bluemsx
+picoarch-clean-bluemsx: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-bluemsx
+
+# -----------------------------------------------------------------------------
+# fMSX
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-fmsx
+picoarch-fmsx: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		fmsx_libretro.so
+
+.PHONY: picoarch-clean-fmsx
+picoarch-clean-fmsx: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-fmsx
+
+# -----------------------------------------------------------------------------
+# GME
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-gme
+picoarch-gme: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		gme_libretro.so
+
+.PHONY: picoarch-clean-gme
+picoarch-clean-gme: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-gme
+
+# -----------------------------------------------------------------------------
+# Mednafen NGP
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-mednafen-ngp
+picoarch-mednafen-ngp: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		mednafen_ngp_libretro.so
+
+.PHONY: picoarch-clean-mednafen-ngp
+picoarch-clean-mednafen-ngp: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-mednafen_ngp
+
+
+# -----------------------------------------------------------------------------
+# Mednafen WonderSwan
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-mednafen-wswan
+picoarch-mednafen-wswan: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		mednafen_wswan_libretro.so
+
+.PHONY: picoarch-clean-mednafen-wswan
+picoarch-clean-mednafen-wswan: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-mednafen_wswan
+
+# -----------------------------------------------------------------------------
+# PokeMini
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-pokemini
+picoarch-pokemini: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		pokemini_libretro.so
+
+.PHONY: picoarch-clean-pokemini
+picoarch-clean-pokemini: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-pokemini
+
+
+# -----------------------------------------------------------------------------
+# QuickNES
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-quicknes
+picoarch-quicknes: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		quicknes_libretro.so
+
+.PHONY: picoarch-clean-quicknes
+picoarch-clean-quicknes: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-quicknes
+
+# -----------------------------------------------------------------------------
+# SMS Plus GX
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-smsplus-gx
+picoarch-smsplus-gx: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		smsplus-gx_libretro.so
+
+.PHONY: picoarch-clean-smsplus-gx
+picoarch-clean-smsplus-gx: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-smsplus-gx
+
+# -----------------------------------------------------------------------------
+# Snes9x 2002
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-snes9x2002
+picoarch-snes9x2002: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		snes9x2002_libretro.so
+
+.PHONY: picoarch-clean-snes9x2002
+picoarch-clean-snes9x2002: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-snes9x2002
+
+# -----------------------------------------------------------------------------
+# Snes9x 2005
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-snes9x2005
+picoarch-snes9x2005: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		snes9x2005_libretro.so
+
+.PHONY: picoarch-clean-snes9x2005
+picoarch-clean-snes9x2005: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-snes9x2005
+
+# -----------------------------------------------------------------------------
+# Stella 2014
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-stella2014
+picoarch-stella2014: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		stella2014_libretro.so
+
+.PHONY: picoarch-clean-stella2014
+picoarch-clean-stella2014: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-stella2014
+
+# -----------------------------------------------------------------------------
+# Handy
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-handy
+picoarch-handy: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		handy_libretro.so
+
+.PHONY: picoarch-clean-handy
+picoarch-clean-handy: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-handy
+
+# -----------------------------------------------------------------------------
+# GnGeo
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-gngeo
+picoarch-gngeo: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		SYSROOT="$(SYSROOT)" \
+		gngeo_libretro.so
+
+.PHONY: picoarch-clean-gngeo
+picoarch-clean-gngeo: picoarch-prepare
+	$(MAKE) -C $(PICOARCH_BUILD) \
+		$(PICOARCH_MAKE_ARGS) \
+		clean-gngeo
+
+# -----------------------------------------------------------------------------
+# Clean all validated cores
+# -----------------------------------------------------------------------------
+
+.PHONY: picoarch-clean-validated
+picoarch-clean-validated: \
+	picoarch-clean-fceumm \
+	picoarch-clean-gambatte \
+	picoarch-clean-gngeo \
+	picoarch-clean-gpsp \
+	picoarch-clean-handy \
+	picoarch-clean-picodrive \
+	picoarch-clean-mame2000 \
+	picoarch-clean-pcsx-rearmed \
+	picoarch-clean-beetle-pce-fast \
+	picoarch-clean-bluemsx \
+	picoarch-clean-fmsx \
+	picoarch-clean-gme \
+	picoarch-clean-mednafen-ngp \
+	picoarch-clean-mednafen-wswan \
+	picoarch-clean-pokemini \
+	picoarch-clean-quicknes \
+	picoarch-clean-smsplus-gx \
+	picoarch-clean-snes9x2002 \
+	picoarch-clean-snes9x2005 \
+	picoarch-clean-stella2014 \
+	picoarch-clean-mame2003
+
 
 clean-sys:
 	cd ./src/libmmenu && make clean
