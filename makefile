@@ -250,6 +250,20 @@ zip:
 
 #--------------------------------------
 
+.PHONY: picoarch-paks picoarch-tool
+
+picoarch-paks:
+	PICOARCH_BUILD="$(PICOARCH_BUILD)" \
+	PICOARCH_OUTPUT="$(PICOARCH_OUTPUT)" \
+	PICOARCH_PAKS_OUTPUT="$(PICOARCH_PAKS_OUTPUT)" \
+	./scripts/picoarch/package-paks.sh
+
+picoarch-tool:
+	PICOARCH_BUILD="$(PICOARCH_BUILD)" \
+	PICOARCH_OUTPUT="$(PICOARCH_OUTPUT)" \
+	PICOARCH_TOOL_OUTPUT="$(PICOARCH_TOOL_OUTPUT)" \
+	./scripts/picoarch/package-tool.sh
+
 clean-sys:
 	cd ./src/libmmenu && make clean
 	cd ./src/MinUI && make clean
