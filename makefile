@@ -264,6 +264,25 @@ picoarch-tool:
 	PICOARCH_TOOL_OUTPUT="$(PICOARCH_TOOL_OUTPUT)" \
 	./scripts/picoarch/package-tool.sh
 
+.PHONY: picoarch-frontend
+
+picoarch-frontend:
+	test -n "$(PICOARCH_BUILD)"
+	test -d "$(PICOARCH_BUILD)"
+	test -x "$(SYSROOT)/usr/bin/sdl-config"
+	test -f "$(MINUI_MMENU_BUILD)/mmenu.h"
+
+	PATH="$(SYSROOT)/usr/bin:$$PATH" \
+		$(MAKE) -C "$(PICOARCH_BUILD)" \
+		platform=trimui \
+		MINUI=1 \
+		CROSS_COMPILE="$(CROSS_COMPILE)" \
+		CC="$(CROSS_COMPILE)gcc --sysroot=$(SYSROOT) -I$(MINUI_MMENU_BUILD)" \
+		CXX="$(CROSS_COMPILE)g++ --sysroot=$(SYSROOT) -I$(MINUI_MMENU_BUILD)" \
+		picoarch
+
+	test -x "$(PICOARCH_BUILD)/picoarch"
+
 clean-sys:
 	cd ./src/libmmenu && make clean
 	cd ./src/MinUI && make clean
