@@ -126,22 +126,30 @@ nes: emu
 
 gen: emu
 	mkdir -p "$(ROMS_PATH)/Genesis"
+	mkdir -p "$(ROMS_PATH)/Sega CD"
+	mkdir -p "$(ROMS_PATH)/Sega 32X"
 	if [ ! -f ./third-party/picodrive/config.mak ]; then cd ./third-party/picodrive && CROSS_COMPILE=/opt/trimui-toolchain/bin/arm-buildroot-linux-gnueabi- ./configure --platform=trimui; fi
 	cd ./third-party/picodrive && make -j
 	cp -R "paks/Genesis.pak" "$(PAYLOAD_PATH)/Emus"
+	cp -R "paks/Sega CD.pak" "$(PAYLOAD_PATH)/Emus"
+	cp -R "paks/Sega 32X.pak" "$(PAYLOAD_PATH)/Emus"
 	cp "third-party/picodrive/PicoDrive" "$(PAYLOAD_PATH)/Emus/Genesis.pak"
 	cp -R "third-party/picodrive/platform/trimui/skin" "$(PAYLOAD_PATH)/Emus/Genesis.pak"
 
 pce: emu
 	mkdir -p "$(ROMS_PATH)/TurboGrafx-16"
+	mkdir -p "$(ROMS_PATH)/TurboGrafx-CD"
 	cd ./third-party/temper/SDL && make -j
 	cp -R "paks/TurboGrafx-16.pak" "$(PAYLOAD_PATH)/Emus"
+	cp -R "paks/TurboGrafx-CD.pak" "$(PAYLOAD_PATH)/Emus"
 	cp "third-party/temper/SDL/temper" "$(PAYLOAD_PATH)/Emus/TurboGrafx-16.pak"
 
 swan: emu
 	mkdir -p "$(ROMS_PATH)/WonderSwan"
+	mkdir -p "$(ROMS_PATH)/WonderSwan Color"
 	cd ./third-party/oswan && make -j
 	cp -R "paks/WonderSwan.pak" "$(PAYLOAD_PATH)/Emus"
+	cp -R "paks/WonderSwan Color.pak" "$(PAYLOAD_PATH)/Emus"
 	cp "third-party/oswan/oswan" "$(PAYLOAD_PATH)/Emus/WonderSwan.pak"
 
 lynx: emu
