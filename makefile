@@ -304,11 +304,17 @@ validate-minui-payload:
 _zip-release:
 	test -n "$(RELEASE_FILE)"
 
-	rm -f "$(BUILD_PATH)/TrimuiUpdate_MinUI.zip"
+	rm -f \
+		"$(BUILD_PATH)/TrimuiUpdate_MinUI.zip" \
+		"$(BUILD_PATH)/trimui_Minui.zip"
 
 	cd "$(PAYLOAD_PATH)" && \
 		zip -qr "../TrimuiUpdate_MinUI.zip" . \
 			-x "*.DS_Store"
+
+	mv \
+		"$(BUILD_PATH)/TrimuiUpdate_MinUI.zip" \
+		"$(BUILD_PATH)/trimui_Minui.zip"
 
 	mkdir -p "$(RELEASE_PATH)"
 	rm -f "$(RELEASE_PATH)/$(RELEASE_FILE)"
@@ -320,7 +326,7 @@ _zip-release:
 			Roms \
 			Bios \
 			$(RELEASE_EXTRA_DIRS) \
-			TrimuiUpdate_MinUI.zip
+			trimui_Minui.zip
 
 	unzip -t "$(RELEASE_PATH)/$(RELEASE_FILE)" >/dev/null
 
