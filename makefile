@@ -14,6 +14,13 @@ BUILD_PATH=./build
 PAYLOAD_PATH=$(BUILD_PATH)/PAYLOAD
 ROMS_PATH=$(BUILD_PATH)/Roms
 
+RELEASE_DATE := $(shell TZ=Europe/Paris date +%Y%m%d)
+VARIANT_RELEASE_BASE := MinUI-$(RELEASE_DATE)-0
+
+MINUI_BASE_PAK_COUNT := 23
+PICOARCH_PAK_COUNT := 27
+PICOARCH_TOTAL_PAK_COUNT := 50
+
 PICOARCH_SOURCE := $(CURDIR)/third-party/picoarch
 PICOARCH_MAKE_ARGS := \
 	platform=trimui \
@@ -194,6 +201,7 @@ retro8: emu
 
 gngeo: lib emu
 	mkdir -p "$(ROMS_PATH)/Neo Geo"
+	mkdir -p "./build/Bios/gngeo"
 	test -f "$(SYSROOT)/usr/lib/libts-1.0.so.0"
 	test -f "$(SYSROOT)/usr/lib/libz.so.1"
 	cd ./third-party/gngeo && $(MAKE) -f Makefile.trimui \
@@ -255,6 +263,90 @@ zip:
 	cd "$(PAYLOAD_PATH)" && rm -f ../TrimuiUpdate_MinUI.zip
 	cd "$(PAYLOAD_PATH)" && zip -r ../TrimuiUpdate_MinUI.zip . -x "*.DS_Store"
 	cd "$(BUILD_PATH)" && zip -r ../release/$(RELEASE_NAME).zip readme.txt version.txt Roms TrimuiUpdate_MinUI.zip
+
+.PHONY: validate-minui-payload
+
+validate-minui-payload:
+	test -d "$(PAYLOAD_PATH)/System"
+	test -d "$(PAYLOAD_PATH)/Emus"
+	test -d "$(PAYLOAD_PATH)/Tools"
+	test -d "$(ROMS_PATH)"
+	test -f "$(BUILD_PATH)/readme.txt"
+	test -f "$(BUILD_PATH)/version.txt"
+
+	@COUNT="$$(find "$(PAYLOAD_PATH)/Emus" \
+		-mindepth 1 \
+		-maxdepth 1 \
+		-type d \
+		-name '*.pak' \
+		| wc -l)"; \
+	if [ "$$COUNT" -ne "$(MINUI_BASE_PAK_COUNT)" ]; then \
+		echo "ERROR: expected $(MINUI_BASE_PAK_COUNT) base MinUI PAKs, found $$COUNT" >&2; \
+		exit 1; \
+	fi
+
+	@for pak in \
+		"Sega CD.pak" \
+		"Sega 32X.pak" \
+		"TurboGrafx-CD.pak" \
+		"WonderSwan Color.pak"; do \
+		test -d "$(PAYLOAD_PATH)/Emus/$$pak" || { \
+			echo "ERROR: missing base MinUI PAK: $$pak" >&2; \
+			exit 1; \
+		}; \
+	done
+
+	# GnGeo is part of base MinUI, so every release needs this directory.
+	mkdir -p "$(BUILD_PATH)/Bios/gngeo"
+
+.PHONY: _zip-release
+
+_zip-release:
+	test -n "$(RELEASE_FILE)"
+
+	rm -f "$(BUILD_PATH)/TrimuiUpdate_MinUI.zip"
+
+	cd "$(PAYLOAD_PATH)" && \
+		zip -qr "../TrimuiUpdate_MinUI.zip" . \
+			-x "*.DS_Store"
+
+	mkdir -p "$(RELEASE_PATH)"
+	rm -f "$(RELEASE_PATH)/$(RELEASE_FILE)"
+
+	cd "$(BUILD_PATH)" && \
+		zip -qr "../release/$(RELEASE_FILE)" \
+			readme.txt \
+			version.txt \
+			Roms \
+			Bios \
+			$(RELEASE_EXTRA_DIRS) \
+			TrimuiUpdate_MinUI.zip
+
+	unzip -t "$(RELEASE_PATH)/$(RELEASE_FILE)" >/dev/null
+
+.PHONY: release-minui release-picoarch release-all
+
+release-minui:
+	$(MAKE) picoarch-clean-payload
+	$(MAKE) validate-minui-payload
+	$(MAKE) _zip-release \
+		RELEASE_FILE="$(VARIANT_RELEASE_BASE)-minui.zip"
+
+release-picoarch:
+	# Always start from a clean base MinUI payload.
+	$(MAKE) picoarch-clean-payload
+	$(MAKE) validate-minui-payload
+
+	$(MAKE) picoarch-payload
+	$(MAKE) validate-picoarch-payload
+
+	$(MAKE) _zip-release \
+		RELEASE_FILE="$(VARIANT_RELEASE_BASE)-picoarch.zip" \
+		RELEASE_EXTRA_DIRS="Saves"
+
+release-all:
+	$(MAKE) release-minui
+	$(MAKE) release-picoarch
 
 #--------------------------------------
 
@@ -740,6 +832,94 @@ picoarch-output: picoarch-validated picoarch-frontend
 picoarch-clean-output:
 	test -n "$(PICOARCH_OUTPUT)"
 	rm -rf "$(PICOARCH_OUTPUT)"
+
+.PHONY: picoarch-payload picoarch-clean-payload
+
+picoarch-payload:
+	$(MAKE) picoarch-output
+	$(MAKE) picoarch-paks
+	$(MAKE) picoarch-tool
+
+	test -n "$(PICOARCH_PAKS_OUTPUT)"
+	test -n "$(PICOARCH_TOOL_OUTPUT)"
+
+	@test "$$(find "$(PICOARCH_PAKS_OUTPUT)" \
+		-mindepth 1 \
+		-maxdepth 1 \
+		-type d \
+		-name '*-picoarch.pak' \
+		| wc -l)" -eq "$(PICOARCH_PAK_COUNT)" || { \
+		echo "ERROR: expected $(PICOARCH_PAK_COUNT) PicoArch PAKs" >&2; \
+		exit 1; \
+	}
+
+	mkdir -p "$(PAYLOAD_PATH)/Emus"
+	mkdir -p "$(PAYLOAD_PATH)/Tools"
+
+	cp -a \
+		"$(PICOARCH_PAKS_OUTPUT)"/*-picoarch.pak \
+		"$(PAYLOAD_PATH)/Emus/"
+
+	rm -rf "$(PAYLOAD_PATH)/Tools/PicoArch.pak"
+
+	cp -a \
+		"$(PICOARCH_TOOL_OUTPUT)/Tools/PicoArch.pak" \
+		"$(PAYLOAD_PATH)/Tools/"
+
+	mkdir -p "$(BUILD_PATH)/Bios/picoarch"
+	mkdir -p "$(BUILD_PATH)/Saves/picoarch"
+
+	@for pak in "$(PICOARCH_PAKS_OUTPUT)"/*-picoarch.pak; do \
+		name="$$(basename "$$pak")"; \
+		system="$${name%-picoarch.pak}"; \
+		mkdir -p "$(ROMS_PATH)/$$system"; \
+	done
+
+.PHONY: validate-picoarch-payload
+
+validate-picoarch-payload:
+	@test "$$(find "$(PAYLOAD_PATH)/Emus" \
+		-mindepth 1 \
+		-maxdepth 1 \
+		-type d \
+		-name '*.pak' \
+		| wc -l)" -eq "$(PICOARCH_TOTAL_PAK_COUNT)" || { \
+		echo "ERROR: expected $(PICOARCH_TOTAL_PAK_COUNT) total PAKs" >&2; \
+		exit 1; \
+	}
+
+	@test "$$(find "$(PAYLOAD_PATH)/Emus" \
+		-mindepth 1 \
+		-maxdepth 1 \
+		-type d \
+		-name '*-picoarch.pak' \
+		| wc -l)" -eq "$(PICOARCH_PAK_COUNT)" || { \
+		echo "ERROR: expected $(PICOARCH_PAK_COUNT) PicoArch PAKs" >&2; \
+		exit 1; \
+	}
+
+	test -d "$(PAYLOAD_PATH)/Tools/PicoArch.pak"
+	test -d "$(BUILD_PATH)/Bios/picoarch"
+	test -d "$(BUILD_PATH)/Saves/picoarch"
+
+	grep -Fq \
+		'ROM_DIR=$${ROM_DIR%-picoarch}' \
+		"$(PAYLOAD_PATH)/System/System.pak/update.sh"
+
+picoarch-clean-payload:
+	@for pak in "$(PAYLOAD_PATH)/Emus/"*-picoarch.pak; do \
+		[ -d "$$pak" ] || continue; \
+		name="$$(basename "$$pak")"; \
+		system="$${name%-picoarch.pak}"; \
+		if [ ! -d "$(PAYLOAD_PATH)/Emus/$$system.pak" ]; then \
+			rm -rf "$(ROMS_PATH)/$$system"; \
+		fi; \
+	done
+
+	rm -rf "$(PAYLOAD_PATH)/Emus/"*-picoarch.pak
+	rm -rf "$(PAYLOAD_PATH)/Tools/PicoArch.pak"
+	rm -rf "$(BUILD_PATH)/Bios/picoarch"
+	rm -rf "$(BUILD_PATH)/Saves/picoarch"
 
 
 clean-sys:
