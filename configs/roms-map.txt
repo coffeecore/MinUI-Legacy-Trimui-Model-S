@@ -1,0 +1,29 @@
+ATARI2600;Atari 2600
+COLECO;ColecoVision
+FC;Nintendo NES
+GB;Nintendo Game Boy
+GBA;Nintendo Game Boy Advance
+GBC;Nintendo Game Boy Color
+GG;Sega Game Gear
+GX4000;Amstrad GX4000
+LYNX;Atari Lynx
+MAME2000;MAME 2000
+MAME2003;MAME 2003
+MD;Sega Genesis
+MSX;MSX
+GME;Game Music
+NEOGEO;SNK Neo Geo
+NGP;SNK Neo Geo Pocket
+NGPC;SNK Neo Geo Pocket Color
+PCE;NEC TurboGrafx-16
+PCECD;NEC TurboGrafx-CD
+PICO8;PICO-8
+POKEMINI;Pokemon Mini
+PS;Sony PlayStation
+SCD;Sega CD
+SFC;Nintendo SNES
+SG1000;Sega SG-1000
+SMS;Sega Master System
+32X;Sega 32X
+WS;Bandai WonderSwan
+WSC;Bandai WonderSwan Color

@@ -121,7 +121,7 @@ create_pak()
     # One system name is used everywhere.
     #
     # Example:
-    #   system="Nintendo"
+    #   system="FC"
     #
     # ROM directory:
     #   /mnt/SDCARD/Roms/Nintendo
@@ -273,13 +273,13 @@ EOF_LAUNCH
 # ---------------------------------------------------------------------
 
 create_pak \
-    "Nintendo" \
+    "FC" \
     "fceumm_libretro.so"
 
 # create_pak \
 #     "Nintendo (QuickNES)" \
 #     "quicknes_libretro.so" \
-#     "Nintendo"
+#     "FC"
 
     # create_pak \
     #     "Famicom Disk System (FCEUmm)" \
@@ -292,15 +292,15 @@ create_pak \
 # ---------------------------------------------------------------------
 
 create_pak \
-    "Game Boy" \
+    "GB" \
     "gambatte_libretro.so"
 
 create_pak \
-    "Game Boy Color" \
+    "GBC" \
     "gambatte_libretro.so"
 
 create_pak \
-    "Game Boy Advance" \
+    "GBA" \
     "gpsp_libretro.so" \
     "swap"
 
@@ -310,20 +310,20 @@ create_pak \
 # ---------------------------------------------------------------------
 
 create_pak \
-    "Game Gear" \
+    "GG" \
     "smsplus-gx_libretro.so" 
 
 create_pak \
-    "Master System" \
+    "SMS" \
     "smsplus-gx_libretro.so"
 
 create_pak \
-    "ColecoVision" \
+    "COLECO" \
     "bluemsx_libretro.so" \
     "bluemsx"
 
 create_pak \
-    "SG-1000" \
+    "SG1000" \
     "bluemsx_libretro.so" \
     "bluemsx"
 
@@ -333,15 +333,15 @@ create_pak \
 # ---------------------------------------------------------------------
 
 create_pak \
-    "Genesis" \
+    "MD" \
     "picodrive_libretro.so"
 
 create_pak \
-    "Sega CD" \
+    "SCD" \
     "picodrive_libretro.so"
 
 create_pak \
-    "Sega 32X" \
+    "32X" \
     "picodrive_libretro.so"
 
 # ---------------------------------------------------------------------
@@ -351,10 +351,10 @@ create_pak \
 # create_pak \
 #     "Super Nintendo (Snes9x 2002)" \
 #     "snes9x2002_libretro.so" \
-#     "Super Nintendo"
+#     "SFC"
 
 create_pak \
-    "Super Nintendo" \
+    "SFC" \
     "snes9x2005_libretro.so"
 
 # ---------------------------------------------------------------------
@@ -362,7 +362,7 @@ create_pak \
 # ---------------------------------------------------------------------
 
 create_pak \
-    "PlayStation" \
+    "PS" \
     "pcsx_rearmed_libretro.so" \
     "psx"
 
@@ -372,11 +372,11 @@ create_pak \
 # ---------------------------------------------------------------------
 
 create_pak \
-    "TurboGrafx-16" \
+    "PCE" \
     "beetle-pce-fast_libretro.so"
 
 create_pak \
-    "TurboGrafx-CD" \
+    "PCECD" \
     "beetle-pce-fast_libretro.so"
 
 # ---------------------------------------------------------------------
@@ -384,28 +384,28 @@ create_pak \
 # ---------------------------------------------------------------------
 
 create_pak \
-    "Neo Geo Pocket" \
+    "NGP" \
     "mednafen_ngp_libretro.so"
 
 create_pak \
-    "Neo Geo Pocket Color" \
+    "NGPC" \
     "mednafen_ngp_libretro.so"
 
 create_pak \
-    "Neo Geo" \
+    "NEOGEO" \
     "gngeo_libretro.so" \
     "swap"
 
 create_pak \
-    "WonderSwan" \
+    "WS" \
     "mednafen_wswan_libretro.so"
 
 create_pak \
-    "WonderSwan Color" \
+    "WSC" \
     "mednafen_wswan_libretro.so"
 
 create_pak \
-    "Pokemon Mini" \
+    "POKEMINI" \
     "pokemini_libretro.so"
 
 # ---------------------------------------------------------------------
@@ -429,7 +429,7 @@ create_pak \
 # ---------------------------------------------------------------------
 
 create_pak \
-    "Atari 2600" \
+    "ATARI2600" \
     "stella2014_libretro.so"
 
 
@@ -438,11 +438,11 @@ create_pak \
 # ---------------------------------------------------------------------
 
 create_pak \
-    "MAME 2000" \
+    "MAME2000" \
     "mame2000_libretro.so"
 
 create_pak \
-    "MAME 2003" \
+    "MAME2003" \
     "mame2003_libretro.so" \
 
 # ---------------------------------------------------------------------
@@ -450,7 +450,7 @@ create_pak \
 # ---------------------------------------------------------------------
 
 create_pak \
-    "Lynx" \
+    "LYNX" \
     "handy_libretro.so"
 
 # ---------------------------------------------------------------------
@@ -458,7 +458,7 @@ create_pak \
 # ---------------------------------------------------------------------
 
 create_pak \
-    "Game Music" \
+    "GME" \
     "gme_libretro.so"
 
 # ---------------------------------------------------------------------

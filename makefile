@@ -80,101 +80,106 @@ standalone-emus: gx4000 stella retro8 gngeo
 
 emu:
 	mkdir -p "$(PAYLOAD_PATH)/Emus"
+	mkdir -p "$(ROMS_PATH)"
+	cp "configs/roms-map.txt" "$(ROMS_PATH)/map.txt"
 
 gb: emu
-	mkdir -p "$(ROMS_PATH)/Game Boy"
+	mkdir -p "$(ROMS_PATH)/GB"
 	cd ./third-party/gambatte-dms && $(MAKE) -j$(JOBS)
-	cp -R "paks/Game Boy.pak" "$(PAYLOAD_PATH)/Emus"
-	cp "third-party/gambatte-dms/gambatte-dms" "$(PAYLOAD_PATH)/Emus/Game Boy.pak"
+	cp -R "paks/GB.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/gambatte-dms/gambatte-dms" "$(PAYLOAD_PATH)/Emus/GB.pak"
 	
-	mkdir -p "$(ROMS_PATH)/Game Boy Color"
-	cp -R "paks/Game Boy Color.pak" "$(PAYLOAD_PATH)/Emus"
+	mkdir -p "$(ROMS_PATH)/GBC"
+	cp -R "paks/GBC.pak" "$(PAYLOAD_PATH)/Emus"
 
 pm: emu
-	mkdir -p "$(ROMS_PATH)/Pokemon Mini"
+	mkdir -p "$(ROMS_PATH)/POKEMINI"
 	cd ./third-party/pokemini/platform/trimui && $(MAKE) -j$(JOBS)
-	cp -R "paks/Pokemon Mini.pak" "$(PAYLOAD_PATH)/Emus"
-	cp "third-party/pokemini/platform/trimui/pokemini" "$(PAYLOAD_PATH)/Emus/Pokemon Mini.pak"
+	cp -R "paks/POKEMINI.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/pokemini/platform/trimui/pokemini" "$(PAYLOAD_PATH)/Emus/POKEMINI.pak"
 
 ngp: emu
-	mkdir -p "$(ROMS_PATH)/Neo Geo Pocket"
+	mkdir -p "$(ROMS_PATH)/NGP"
 	cd ./third-party/race && $(MAKE) -j$(JOBS)
-	cp -R "paks/Neo Geo Pocket.pak" "$(PAYLOAD_PATH)/Emus"
-	cp "third-party/race/race-od" "$(PAYLOAD_PATH)/Emus/Neo Geo Pocket.pak"
+	cp -R "paks/NGP.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/race/race-od" "$(PAYLOAD_PATH)/Emus/NGP.pak"
 	
-	mkdir -p "$(ROMS_PATH)/Neo Geo Pocket Color"
-	cp -R "paks/Neo Geo Pocket Color.pak" "$(PAYLOAD_PATH)/Emus"
+	mkdir -p "$(ROMS_PATH)/NGPC"
+	cp -R "paks/NGPC.pak" "$(PAYLOAD_PATH)/Emus"
 
 gg: emu
-	mkdir -p "$(ROMS_PATH)/Game Gear"
+	mkdir -p "$(ROMS_PATH)/GG"
 	cd ./third-party/sms_sdl && $(MAKE) -j$(JOBS)
-	cp -R "paks/Game Gear.pak" "$(PAYLOAD_PATH)/Emus"
-	cp "third-party/sms_sdl/sms_sdl" "$(PAYLOAD_PATH)/Emus/Game Gear.pak"
+	cp -R "paks/GG.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/sms_sdl/sms_sdl" "$(PAYLOAD_PATH)/Emus/GG.pak"
 	
-	mkdir -p "$(ROMS_PATH)/Master System"
-	cp -R "paks/Master System.pak" "$(PAYLOAD_PATH)/Emus"
+	mkdir -p "$(ROMS_PATH)/SMS"
+	cp -R "paks/SMS.pak" "$(PAYLOAD_PATH)/Emus"
 
 snes: emu
-	mkdir -p "$(ROMS_PATH)/Super Nintendo"
+	mkdir -p "$(ROMS_PATH)/SFC"
 	cd ./third-party/snes9x2002 && $(MAKE) -j$(JOBS)
-	cp -R "paks/Super Nintendo.pak" "$(PAYLOAD_PATH)/Emus"
-	cp "third-party/snes9x2002/snes9x2002" "$(PAYLOAD_PATH)/Emus/Super Nintendo.pak"
+	cp -R "paks/SFC.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/snes9x2002/snes9x2002" "$(PAYLOAD_PATH)/Emus/SFC.pak"
 
 ps: emu
-	mkdir -p "$(ROMS_PATH)/PlayStation"
+	mkdir -p "$(ROMS_PATH)/PS"
 	if [ ! -f ./third-party/pcsx_rearmed/config.mak ]; then cd ./third-party/pcsx_rearmed && CROSS_COMPILE=/opt/trimui-toolchain/bin/arm-buildroot-linux-gnueabi- ./configure --platform=trimui; fi
 	cd ./third-party/pcsx_rearmed && $(MAKE) -j$(JOBS)
-	cp -R "paks/PlayStation.pak" "$(PAYLOAD_PATH)/Emus"
-	cp "third-party/pcsx_rearmed/pcsx" "$(PAYLOAD_PATH)/Emus/PlayStation.pak"
+	cp -R "paks/PS.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/pcsx_rearmed/pcsx" "$(PAYLOAD_PATH)/Emus/PS.pak"
 
 gba: emu
-	mkdir -p "$(ROMS_PATH)/Game Boy Advance"
+	mkdir -p "$(ROMS_PATH)/GBA"
 	cd ./third-party/picogpsp && $(MAKE) -j$(JOBS)
-	cp -R "paks/Game Boy Advance.pak" "$(PAYLOAD_PATH)/Emus"
-	cp "third-party/picogpsp/picogpsp" "$(PAYLOAD_PATH)/Emus/Game Boy Advance.pak"
+	cp -R "paks/GBA.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/picogpsp/picogpsp" "$(PAYLOAD_PATH)/Emus/GBA.pak"
 	
 nes: emu
-	mkdir -p "$(ROMS_PATH)/Nintendo"
+	mkdir -p "$(ROMS_PATH)/FC"
 	cd ./third-party/fceux && $(MAKE) -j$(JOBS)
-	cp -R "paks/Nintendo.pak" "$(PAYLOAD_PATH)/Emus"
-	cp "third-party/fceux/fceux/fceux.dge" "$(PAYLOAD_PATH)/Emus/Nintendo.pak"
-	cp "third-party/fceux/fceux/backdrop.png" "$(PAYLOAD_PATH)/Emus/Nintendo.pak"
-	cp "third-party/fceux/fceux/sp.bmp" "$(PAYLOAD_PATH)/Emus/Nintendo.pak"
-	cp -R "third-party/fceux/fceux/palettes" "$(PAYLOAD_PATH)/Emus/Nintendo.pak"
+	cp -R "paks/FC.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/fceux/fceux/fceux.dge" "$(PAYLOAD_PATH)/Emus/FC.pak"
+	cp "third-party/fceux/fceux/backdrop.png" "$(PAYLOAD_PATH)/Emus/FC.pak"
+	cp "third-party/fceux/fceux/sp.bmp" "$(PAYLOAD_PATH)/Emus/FC.pak"
+	cp -R "third-party/fceux/fceux/palettes" "$(PAYLOAD_PATH)/Emus/FC.pak"
 
 gen: emu
-	mkdir -p "$(ROMS_PATH)/Genesis"
-	mkdir -p "$(ROMS_PATH)/Sega CD"
-	mkdir -p "$(ROMS_PATH)/Sega 32X"
+	mkdir -p "$(ROMS_PATH)/MD"
+	mkdir -p "$(ROMS_PATH)/SCD"
+	mkdir -p "$(ROMS_PATH)/32X"
 	if [ ! -f ./third-party/picodrive/config.mak ]; then cd ./third-party/picodrive && CROSS_COMPILE=/opt/trimui-toolchain/bin/arm-buildroot-linux-gnueabi- ./configure --platform=trimui; fi
 	cd ./third-party/picodrive && $(MAKE) -j$(JOBS)
-	cp -R "paks/Genesis.pak" "$(PAYLOAD_PATH)/Emus"
-	cp -R "paks/Sega CD.pak" "$(PAYLOAD_PATH)/Emus"
-	cp -R "paks/Sega 32X.pak" "$(PAYLOAD_PATH)/Emus"
-	cp "third-party/picodrive/PicoDrive" "$(PAYLOAD_PATH)/Emus/Genesis.pak"
-	cp -R "third-party/picodrive/platform/trimui/skin" "$(PAYLOAD_PATH)/Emus/Genesis.pak"
+	cp -R "paks/MD.pak" "$(PAYLOAD_PATH)/Emus"
+	cp -R "paks/SCD.pak" "$(PAYLOAD_PATH)/Emus"
+	cp -R "paks/32X.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/picodrive/PicoDrive" "$(PAYLOAD_PATH)/Emus/MD.pak"
+	mkdir -p "$(PAYLOAD_PATH)/Emus/MD.pak/skin"
+	cp -R \
+		"third-party/picodrive/platform/opendingux/data/skin/." \
+		"$(PAYLOAD_PATH)/Emus/MD.pak/skin/"
 
 pce: emu
-	mkdir -p "$(ROMS_PATH)/TurboGrafx-16"
-	mkdir -p "$(ROMS_PATH)/TurboGrafx-CD"
+	mkdir -p "$(ROMS_PATH)/PCE"
+	mkdir -p "$(ROMS_PATH)/PCECD"
 	cd ./third-party/temper/SDL && $(MAKE) -j$(JOBS)
-	cp -R "paks/TurboGrafx-16.pak" "$(PAYLOAD_PATH)/Emus"
-	cp -R "paks/TurboGrafx-CD.pak" "$(PAYLOAD_PATH)/Emus"
-	cp "third-party/temper/SDL/temper" "$(PAYLOAD_PATH)/Emus/TurboGrafx-16.pak"
+	cp -R "paks/PCE.pak" "$(PAYLOAD_PATH)/Emus"
+	cp -R "paks/PCECD.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/temper/SDL/temper" "$(PAYLOAD_PATH)/Emus/PCE.pak"
 
 swan: emu
-	mkdir -p "$(ROMS_PATH)/WonderSwan"
-	mkdir -p "$(ROMS_PATH)/WonderSwan Color"
+	mkdir -p "$(ROMS_PATH)/WS"
+	mkdir -p "$(ROMS_PATH)/WSC"
 	cd ./third-party/oswan && $(MAKE) -j$(JOBS)
-	cp -R "paks/WonderSwan.pak" "$(PAYLOAD_PATH)/Emus"
-	cp -R "paks/WonderSwan Color.pak" "$(PAYLOAD_PATH)/Emus"
-	cp "third-party/oswan/oswan" "$(PAYLOAD_PATH)/Emus/WonderSwan.pak"
+	cp -R "paks/WS.pak" "$(PAYLOAD_PATH)/Emus"
+	cp -R "paks/WSC.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/oswan/oswan" "$(PAYLOAD_PATH)/Emus/WS.pak"
 
 lynx: emu
-	mkdir -p "$(ROMS_PATH)/Lynx"
+	mkdir -p "$(ROMS_PATH)/LYNX"
 	cd ./third-party/handy-rs97 && $(MAKE) -j$(JOBS)
-	cp -R "paks/Lynx.pak" "$(PAYLOAD_PATH)/Emus"
-	cp "third-party/handy-rs97/handy" "$(PAYLOAD_PATH)/Emus/Lynx.pak"
+	cp -R "paks/LYNX.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/handy-rs97/handy" "$(PAYLOAD_PATH)/Emus/LYNX.pak"
 
 gx4000: lib emu
 	mkdir -p "$(ROMS_PATH)/GX4000"
@@ -183,24 +188,24 @@ gx4000: lib emu
 	cp "third-party/arnold/arnold" "$(PAYLOAD_PATH)/Emus/GX4000.pak/arnold"
 
 stella: emu
-	mkdir -p "$(ROMS_PATH)/Atari 2600"
+	mkdir -p "$(ROMS_PATH)/ATARI2600"
 	test -f "$(SYSROOT)/usr/lib/libSDL.a"
 	test -f "$(SYSROOT)/usr/lib/libpng.a"
 	cp "configs/stella.mak" "third-party/stella/config.mak"
 	cd ./third-party/stella && $(MAKE) -j$(JOBS) \
 		CROSS_COMPILE="$(CROSS_COMPILE)" \
 		SYSROOT="$(SYSROOT)"
-	cp -R "paks/Atari 2600.pak" "$(PAYLOAD_PATH)/Emus"
-	cp "third-party/stella/stella" "$(PAYLOAD_PATH)/Emus/Atari 2600.pak/stella"
+	cp -R "paks/ATARI2600.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/stella/stella" "$(PAYLOAD_PATH)/Emus/ATARI2600.pak/stella"
 
 retro8: emu
-	mkdir -p "$(ROMS_PATH)/PICO-8"
+	mkdir -p "$(ROMS_PATH)/PICO8"
 	cd ./third-party/retro8 && $(MAKE) -j$(JOBS)
-	cp -R "paks/PICO-8.pak" "$(PAYLOAD_PATH)/Emus"
-	cp "third-party/retro8/retro8" "$(PAYLOAD_PATH)/Emus/PICO-8.pak/retro8"
+	cp -R "paks/PICO8.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/retro8/retro8" "$(PAYLOAD_PATH)/Emus/PICO8.pak/retro8"
 
 gngeo: lib emu
-	mkdir -p "$(ROMS_PATH)/Neo Geo"
+	mkdir -p "$(ROMS_PATH)/NEOGEO"
 	mkdir -p "./build/Bios/gngeo"
 	test -f "$(SYSROOT)/usr/lib/libts-1.0.so.0"
 	test -f "$(SYSROOT)/usr/lib/libz.so.1"
@@ -208,16 +213,16 @@ gngeo: lib emu
 		CROSS_COMPILE="$(CROSS_COMPILE)" \
 		SYSROOT="$(SYSROOT)" \
 		MMENU_DIR="$(CURDIR)/src/libmmenu"
-	cp -R "paks/Neo Geo.pak" "$(PAYLOAD_PATH)/Emus"
-	cp "third-party/gngeo/gngeo" "$(PAYLOAD_PATH)/Emus/Neo Geo.pak/gngeo"
-	mkdir -p "$(PAYLOAD_PATH)/Emus/Neo Geo.pak/lib"
+	cp -R "paks/NEOGEO.pak" "$(PAYLOAD_PATH)/Emus"
+	cp "third-party/gngeo/gngeo" "$(PAYLOAD_PATH)/Emus/NEOGEO.pak/gngeo"
+	mkdir -p "$(PAYLOAD_PATH)/Emus/NEOGEO.pak/lib"
 	cp -L $(SYSROOT)/usr/lib/libts-1.0.so* \
-		"$(PAYLOAD_PATH)/Emus/Neo Geo.pak/lib/"
+		"$(PAYLOAD_PATH)/Emus/NEOGEO.pak/lib/"
 	cp -L "$(SYSROOT)/usr/lib/libz.so.1" \
-		"$(PAYLOAD_PATH)/Emus/Neo Geo.pak/lib/libz.so.1"
+		"$(PAYLOAD_PATH)/Emus/NEOGEO.pak/lib/libz.so.1"
 	@if [ -d "$(SYSROOT)/usr/lib/ts" ]; then \
 		cp -aL "$(SYSROOT)/usr/lib/ts" \
-			"$(PAYLOAD_PATH)/Emus/Neo Geo.pak/lib/"; \
+			"$(PAYLOAD_PATH)/Emus/NEOGEO.pak/lib/"; \
 	fi
 
 #--------------------------------------
@@ -286,10 +291,10 @@ validate-minui-payload:
 	fi
 
 	@for pak in \
-		"Sega CD.pak" \
-		"Sega 32X.pak" \
-		"TurboGrafx-CD.pak" \
-		"WonderSwan Color.pak"; do \
+		"SCD.pak" \
+		"32X.pak" \
+		"PCECD.pak" \
+		"WSC.pak"; do \
 		test -d "$(PAYLOAD_PATH)/Emus/$$pak" || { \
 			echo "ERROR: missing base MinUI PAK: $$pak" >&2; \
 			exit 1; \
@@ -632,7 +637,7 @@ picoarch-clean-mednafen-ngp: picoarch-prepare
 
 
 # -----------------------------------------------------------------------------
-# Mednafen WonderSwan
+# Mednafen WS
 # -----------------------------------------------------------------------------
 
 .PHONY: picoarch-mednafen-wswan
