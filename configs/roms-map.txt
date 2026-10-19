@@ -23,7 +23,7 @@ PS;Sony PlayStation
 SCD;Sega CD
 SFC;Nintendo SNES
 SG1000;Sega SG-1000
-SMS;Sega Master System
+MS;Sega Master System
 32X;Sega 32X
 WS;Bandai WonderSwan
 WSC;Bandai WonderSwan Color

@@ -314,7 +314,7 @@ create_pak \
     "smsplus-gx_libretro.so" 
 
 create_pak \
-    "SMS" \
+    "MS" \
     "smsplus-gx_libretro.so"
 
 create_pak \

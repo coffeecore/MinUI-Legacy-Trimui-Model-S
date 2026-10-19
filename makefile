@@ -113,8 +113,8 @@ gg: emu
 	cp -R "paks/GG.pak" "$(PAYLOAD_PATH)/Emus"
 	cp "third-party/sms_sdl/sms_sdl" "$(PAYLOAD_PATH)/Emus/GG.pak"
 	
-	mkdir -p "$(ROMS_PATH)/SMS"
-	cp -R "paks/SMS.pak" "$(PAYLOAD_PATH)/Emus"
+	mkdir -p "$(ROMS_PATH)/MS"
+	cp -R "paks/MS.pak" "$(PAYLOAD_PATH)/Emus"
 
 snes: emu
 	mkdir -p "$(ROMS_PATH)/SFC"
