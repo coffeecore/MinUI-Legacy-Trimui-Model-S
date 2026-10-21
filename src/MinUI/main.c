@@ -2591,29 +2591,76 @@ int main(void) {
 			}
 		}
 		if (!Input_isPressed(kButtonStart) && !Input_isPressed(kButtonSelect)) {
-			if (Input_justRepeated(kButtonL)) { // previous alpha
-				Entry* entry = top->entries->items[selected];
-				int i = entry->alpha-1;
-				if (i>=0) {
-					selected = top->alphas->items[i];
-					if (total>kMaxRows) {
-						top->start = selected;
+			int is_collection =
+				match_prefix(kCollectionsDir "/", top->path) &&
+				match_suffix(".txt", top->path);
+
+			if (Input_justRepeated(kButtonL)) {
+				if (is_collection) { // previous page
+					selected -= kMaxRows;
+
+					if (selected < 0) {
+						selected = 0;
+						top->start = 0;
+						top->end = (total < kMaxRows) ? total : kMaxRows;
+					}
+					else if (selected < top->start) {
+						top->start -= kMaxRows;
+						if (top->start < 0) top->start = 0;
 						top->end = top->start + kMaxRows;
-						if (top->end>total) top->end = total;
-						top->start = top->end - kMaxRows;
+					}
+				}
+				else { // previous alpha
+					Entry* entry = top->entries->items[selected];
+					int i = entry->alpha - 1;
+
+					if (i >= 0) {
+						selected = top->alphas->items[i];
+
+						if (total > kMaxRows) {
+							top->start = selected;
+							top->end = top->start + kMaxRows;
+
+							if (top->end > total) top->end = total;
+
+							top->start = top->end - kMaxRows;
+						}
 					}
 				}
 			}
-			else if (Input_justRepeated(kButtonR)) { // next alpha
-				Entry* entry = top->entries->items[selected];
-				int i = entry->alpha+1;
-				if (i<top->alphas->count) {
-					selected = top->alphas->items[i];
-					if (total>kMaxRows) {
-						top->start = selected;
-						top->end = top->start + kMaxRows;
-						if (top->end>total) top->end = total;
+			else if (Input_justRepeated(kButtonR)) {
+				if (is_collection) { // next page
+					selected += kMaxRows;
+
+					if (selected >= total) {
+						selected = total - 1;
+						int start = total - kMaxRows;
+						top->start = (start < 0) ? 0 : start;
+						top->end = total;
+					}
+					else if (selected >= top->end) {
+						top->end += kMaxRows;
+
+						if (top->end > total) top->end = total;
+
 						top->start = top->end - kMaxRows;
+					}
+				}
+				else { // next alpha
+					Entry* entry = top->entries->items[selected];
+					int i = entry->alpha + 1;
+
+					if (i < top->alphas->count) {
+						selected = top->alphas->items[i];
+
+						if (total > kMaxRows) {
+							top->start = selected;
+							top->end = top->start + kMaxRows;
+
+							if (top->end > total) top->end = total;
+
+							top->start = top->end - kMaxRows;
+						}
 					}
 				}
 			}
