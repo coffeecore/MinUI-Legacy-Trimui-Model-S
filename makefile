@@ -32,6 +32,8 @@ PICOARCH_MAKE_ARGS := \
 CROSS_COMPILE ?= /opt/trimui-toolchain/bin/arm-buildroot-linux-gnueabi-
 SYSROOT ?= /opt/trimui-toolchain/arm-buildroot-linux-gnueabi/sysroot
 
+OD_COMMANDER_BUILD := $(BUILD_PATH)/od-commander
+
 #--------------------------------------
 all: readme sys emus tools zip
 #--------------------------------------
@@ -226,7 +228,7 @@ gngeo: lib emu
 	fi
 
 #--------------------------------------
-tools: bridge commander reload stock tips clock # zero
+tools: bridge commander od-commander reload stock tips clock # zero
 #--------------------------------------
 
 tool:
@@ -240,6 +242,27 @@ commander: tool
 	cp -R "paks/Commander.pak" "$(PAYLOAD_PATH)/Tools"
 	cp "third-party/DinguxCommander/output/trimui/DinguxCommander" "$(PAYLOAD_PATH)/Tools/Commander.pak"
 	cp -R "third-party/DinguxCommander/res" "$(PAYLOAD_PATH)/Tools/Commander.pak"
+
+od-commander: tool
+	rm -rf "$(OD_COMMANDER_BUILD)"
+
+	/usr/bin/cmake \
+		-S "./third-party/od-commander" \
+		-B "$(OD_COMMANDER_BUILD)" \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_TOOLCHAIN_FILE=/opt/trimui-toolchain/usr/share/buildroot/toolchainfile.cmake \
+		-DTARGET_PLATFORM=host \
+		-DUSE_SDL2=OFF \
+		-DWITH_SYSTEM_SDL_TTF=ON \
+		-DWITH_SYSTEM_SDL_GFX=OFF \
+		-DASAN=OFF \
+		-DUBSAN=OFF
+
+	/usr/bin/cmake --build "$(OD_COMMANDER_BUILD)" -j$(JOBS)
+
+	cp -R "paks/OD Commander.pak" "$(PAYLOAD_PATH)/Tools"
+	cp "$(OD_COMMANDER_BUILD)/commander" "$(PAYLOAD_PATH)/Tools/OD Commander.pak/commander"
+	cp -R "third-party/od-commander/res" "$(PAYLOAD_PATH)/Tools/OD Commander.pak"
 
 poweroff: tool
 	cp -R "paks/Power Off.pak" "$(PAYLOAD_PATH)/Tools"

@@ -64,3 +64,6 @@
 [submodule "third-party/picoarch"]
 	path = third-party/picoarch
 	url = https://github.com/coffeecore/picoarch.git
+[submodule "third-party/od-commander"]
+	path = third-party/od-commander
+	url = https://github.com/od-contrib/commander.git
