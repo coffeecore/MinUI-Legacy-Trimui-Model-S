@@ -264,6 +264,40 @@ static void EntryArray_sort(Array* self) {
 	qsort(self->items, self->count, sizeof(void*), EntryArray_sortEntry);
 }
 
+static const char* Entry_filename(Entry* entry) {
+	char* slash = strrchr(entry->path, '/');
+	return slash ? slash + 1 : entry->path;
+}
+
+static int EntryArray_sortFilename(const void* a, const void* b) {
+	Entry* item1 = *(Entry**)a;
+	Entry* item2 = *(Entry**)b;
+
+	return strcmp(Entry_filename(item1), Entry_filename(item2));
+}
+
+static int EntryArray_findFilename(Array* self, const char* filename) {
+	int low = 0;
+	int high = self->count - 1;
+
+	while (low <= high) {
+		int mid = low + (high - low) / 2;
+		Entry* entry = self->items[mid];
+		int cmp = strcmp(filename, Entry_filename(entry));
+
+		if (cmp == 0) return mid;
+
+		if (cmp < 0) {
+			high = mid - 1;
+		}
+		else {
+			low = mid + 1;
+		}
+	}
+
+	return -1;
+}
+
 static void EntryArray_free(Array* self) {
 	for (int i=0; i<self->count; i++) {
 		Entry_free(self->items[i]);
@@ -559,6 +593,50 @@ static int applyMap(const char* path, Array* entries) {
 	FILE* file = fopen(map_path, "r");
 	if (!file) return 0;
 
+	/*
+	 * Build a temporary list containing only entries that physically belong
+	 * to the directory owning this map.txt.
+	 *
+	 * Sorting pointers by real filename lets each map lookup use a binary
+	 * search instead of scanning every Entry for every line in map.txt.
+	 *
+	 * The original entries array is untouched, so display ordering and
+	 * collection ordering remain unchanged.
+	 */
+	Array* mapped_entries = Array_new();
+	size_t path_len = strlen(path);
+
+	for (int i=0; i<entries->count; i++) {
+		Entry* entry = entries->items[i];
+
+		char* slash = strrchr(entry->path, '/');
+		if (!slash) continue;
+
+		size_t dir_len = slash - entry->path;
+
+		if (
+			path_len != dir_len ||
+			strncmp(entry->path, path, dir_len) != 0
+		) {
+			continue;
+		}
+
+		Array_push(mapped_entries, entry);
+	}
+
+	if (mapped_entries->count == 0) {
+		Array_free(mapped_entries);
+		fclose(file);
+		return 0;
+	}
+
+	qsort(
+		mapped_entries->items,
+		mapped_entries->count,
+		sizeof(void*),
+		EntryArray_sortFilename
+	);
+
 	int filter = 0;
 	char line[256];
 
@@ -583,7 +661,6 @@ static int applyMap(const char* path, Array* entries) {
 		char* separator = strchr(line, ';');
 		char* tab = strchr(line, '\t');
 
-		// Use whichever valid separator occurs first.
 		if (tab && (!separator || tab < separator)) {
 			separator = tab;
 		}
@@ -595,29 +672,30 @@ static int applyMap(const char* path, Array* entries) {
 		char* filename = line;
 		char* alias = separator + 1;
 
-		// Ignore malformed mappings.
 		if (filename[0] == '\0' || alias[0] == '\0') continue;
 
-		for (int i=0; i<entries->count; i++) {
-			Entry* entry = entries->items[i];
+		int found = EntryArray_findFilename(mapped_entries, filename);
+		if (found < 0) continue;
 
-			char* slash = strrchr(entry->path, '/');
-			if (!slash) continue;
+		/*
+		 * A collection may contain the same ROM more than once.
+		 * Binary search returns one matching Entry, so walk backwards to
+		 * the first duplicate and then update every matching Entry.
+		 */
+		while (
+			found > 0 &&
+			strcmp(
+				filename,
+				Entry_filename(mapped_entries->items[found - 1])
+			) == 0
+		) {
+			found--;
+		}
 
-			// The map only applies to entries physically located
-			// in the directory containing this map.txt.
-			size_t dir_len = slash - entry->path;
+		for (int i=found; i<mapped_entries->count; i++) {
+			Entry* entry = mapped_entries->items[i];
 
-			if (
-				strlen(path) != dir_len ||
-				strncmp(entry->path, path, dir_len) != 0
-			) {
-				continue;
-			}
-
-			char* entry_filename = slash + 1;
-
-			if (!exact_match(filename, entry_filename)) continue;
+			if (strcmp(filename, Entry_filename(entry)) != 0) break;
 
 			free(entry->name);
 			entry->name = copy_string(alias);
@@ -626,6 +704,7 @@ static int applyMap(const char* path, Array* entries) {
 		}
 	}
 
+	Array_free(mapped_entries);
 	fclose(file);
 
 	return filter;
@@ -653,6 +732,7 @@ static Array* filterHiddenEntries(Array* entries) {
 
 static Array* applySourceMaps(Array* entries) {
 	int filter = 0;
+	Array* processed_dirs = Array_new();
 
 	for (int i=0; i<entries->count; i++) {
 		Entry* entry = entries->items[i];
@@ -664,29 +744,18 @@ static Array* applySourceMaps(Array* entries) {
 		char dir[256];
 		getParentDir(entry->path, dir);
 
-		// Has this source directory already been processed?
-		int processed = 0;
+		// A collection can contain many ROMs from the same system.
+		// Process each source directory only once.
+		if (StringArray_indexOf(processed_dirs, dir) >= 0) continue;
 
-		for (int j=0; j<i; j++) {
-			Entry* prior = entries->items[j];
-
-			if (!match_prefix(kRomsDir, prior->path)) continue;
-
-			char prior_dir[256];
-			getParentDir(prior->path, prior_dir);
-
-			if (exact_match(dir, prior_dir)) {
-				processed = 1;
-				break;
-			}
-		}
-
-		if (processed) continue;
+		Array_push(processed_dirs, copy_string(dir));
 
 		if (applyMap(dir, entries)) {
 			filter = 1;
 		}
 	}
+
+	StringArray_free(processed_dirs);
 
 	if (filter) {
 		entries = filterHiddenEntries(entries);
