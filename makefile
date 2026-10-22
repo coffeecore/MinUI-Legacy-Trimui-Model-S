@@ -386,21 +386,19 @@ release-all:
 
 .PHONY: picoarch-paks picoarch-tool
 
-picoarch-paks:
+picoarch-paks: picoarch-validated picoarch-frontend
 	PICOARCH_BUILD="$(PICOARCH_BUILD)" \
-	PICOARCH_OUTPUT="$(PICOARCH_OUTPUT)" \
 	PICOARCH_PAKS_OUTPUT="$(PICOARCH_PAKS_OUTPUT)" \
 	./scripts/picoarch/package-paks.sh
 
-picoarch-tool:
+picoarch-tool: picoarch-validated picoarch-frontend
 	PICOARCH_BUILD="$(PICOARCH_BUILD)" \
-	PICOARCH_OUTPUT="$(PICOARCH_OUTPUT)" \
 	PICOARCH_TOOL_OUTPUT="$(PICOARCH_TOOL_OUTPUT)" \
 	./scripts/picoarch/package-tool.sh
 
 .PHONY: picoarch-frontend
 
-picoarch-frontend:
+picoarch-frontend: picoarch-prepare
 	test -n "$(PICOARCH_BUILD)"
 	test -d "$(PICOARCH_BUILD)"
 	test -x "$(SYSROOT)/usr/bin/sdl-config"
@@ -453,46 +451,9 @@ picoarch-clean-validated: picoarch-prepare
 		clean-cores
 
 
-.PHONY: picoarch-output
-
-picoarch-output: picoarch-validated picoarch-frontend
-	test -n "$(PICOARCH_OUTPUT)"
-	test -x "$(PICOARCH_BUILD)/picoarch"
-
-	@test "$$(find "$(PICOARCH_BUILD)" \
-		-maxdepth 1 \
-		-type f \
-		-name '*_libretro.so' \
-		| wc -l)" -eq 21 || { \
-		echo "ERROR: expected 21 validated PicoArch cores in $(PICOARCH_BUILD)" >&2; \
-		exit 1; \
-	}
-
-	rm -rf "$(PICOARCH_OUTPUT)"
-	mkdir -p "$(PICOARCH_OUTPUT)/cores"
-
-	cp \
-		"$(PICOARCH_BUILD)/picoarch" \
-		"$(PICOARCH_OUTPUT)/picoarch"
-
-	find "$(PICOARCH_BUILD)" \
-		-maxdepth 1 \
-		-type f \
-		-name '*_libretro.so' \
-		-exec cp {} "$(PICOARCH_OUTPUT)/cores/" \;
-
-.PHONY: picoarch-clean-output
-
-picoarch-clean-output:
-	test -n "$(PICOARCH_OUTPUT)"
-	rm -rf "$(PICOARCH_OUTPUT)"
-
 .PHONY: picoarch-payload picoarch-clean-payload
 
-picoarch-payload:
-	$(MAKE) picoarch-output
-	$(MAKE) picoarch-paks
-	$(MAKE) picoarch-tool
+picoarch-payload: picoarch-paks picoarch-tool
 
 	test -n "$(PICOARCH_PAKS_OUTPUT)"
 	test -n "$(PICOARCH_TOOL_OUTPUT)"

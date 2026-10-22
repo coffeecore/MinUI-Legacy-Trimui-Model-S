@@ -2,7 +2,6 @@
 set -eu
 
 : "${PICOARCH_BUILD:?PICOARCH_BUILD is required}"
-: "${PICOARCH_OUTPUT:?PICOARCH_OUTPUT is required}"
 : "${PICOARCH_TOOL_OUTPUT:?PICOARCH_TOOL_OUTPUT is required}"
 
 TOOL_OUTPUT="$PICOARCH_TOOL_OUTPUT"
@@ -14,7 +13,7 @@ rm -rf "$TOOL_OUTPUT"
 
 mkdir -p "$PAK/cores"
 
-test -x "$PICOARCH_OUTPUT/picoarch"
+test -x "$PICOARCH_BUILD/picoarch"
 
 SKIN_DIR="$PICOARCH_BUILD/picodrive/platform/opendingux/data/skin"
 
@@ -25,7 +24,7 @@ if [ ! -f "$SKIN_DIR/font.png" ] || \
     exit 1
 fi
 
-cp "$PICOARCH_OUTPUT/picoarch" "$PAK/picoarch"
+cp "$PICOARCH_BUILD/picoarch" "$PAK/picoarch"
 
 # PicoArch resolves its libpicofe skin relative to the picoarch executable.
 mkdir -p "$PAK/skin"
@@ -35,7 +34,7 @@ test -f "$PAK/skin/font.png"
 test -f "$PAK/skin/selector.png"
 test -f "$PAK/skin/skin.txt"
 
-find "$PICOARCH_OUTPUT/cores" \
+find "$PICOARCH_BUILD" \
     -maxdepth 1 \
     -type f \
     -name '*_libretro.so' \
