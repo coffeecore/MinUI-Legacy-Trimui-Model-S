@@ -1,6 +1,8 @@
 JOBS ?= 2
 export JOBS
 
+WITH_GMENUNX ?= 0
+
 # minui/makefile
 
 .PHONY: clean
@@ -228,7 +230,7 @@ gngeo: lib emu
 	fi
 
 #--------------------------------------
-tools: bridge commander od-commander reload stock tips clock # zero
+tools: bridge commander od-commander reload stock tips clock gmenunx # zero
 #--------------------------------------
 
 tool:
@@ -280,6 +282,14 @@ clock: tool
 	cd ./src/clock && make
 	cp -R "paks/Clock.pak" "$(PAYLOAD_PATH)/Tools"
 	cp "src/clock/clock" "$(PAYLOAD_PATH)/Tools/Clock.pak"
+
+.PHONY: gmenunx
+gmenunx: tool
+ifeq ($(WITH_GMENUNX),1)
+	cp -R "paks/GMenuNX.pak" "$(PAYLOAD_PATH)/Tools"
+else
+	rm -rf "$(PAYLOAD_PATH)/Tools/GMenuNX.pak"
+endif
 
 zero: tool
 	cp -R "paks/Zero Stock.pak" "$(PAYLOAD_PATH)/Tools"
@@ -360,13 +370,13 @@ _zip-release:
 
 .PHONY: release-minui release-picoarch release-all
 
-release-minui:
+release-minui: gmenunx
 	$(MAKE) picoarch-clean-payload
 	$(MAKE) validate-minui-payload
 	$(MAKE) _zip-release \
 		RELEASE_FILE="$(VARIANT_RELEASE_BASE)-minui.zip"
 
-release-picoarch:
+release-picoarch: gmenunx
 	# Always start from a clean base MinUI payload.
 	$(MAKE) picoarch-clean-payload
 	$(MAKE) validate-minui-payload

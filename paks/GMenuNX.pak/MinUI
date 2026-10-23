@@ -1,0 +1,3 @@
+title=MinUI
+exec=/mnt/SDCARD/Apps/gmenunx/switch-minui.sh
+selectorbrowser=false
