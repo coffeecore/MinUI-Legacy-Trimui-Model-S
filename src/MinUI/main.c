@@ -276,6 +276,13 @@ static int EntryArray_sortFilename(const void* a, const void* b) {
 	return strcmp(Entry_filename(item1), Entry_filename(item2));
 }
 
+static int EntryArray_sortPath(const void* a, const void* b) {
+	Entry* item1 = *(Entry**)a;
+	Entry* item2 = *(Entry**)b;
+
+	return strcmp(item1->path, item2->path);
+}
+
 static int EntryArray_findFilename(Array* self, const char* filename) {
 	int low = 0;
 	int high = self->count - 1;
@@ -584,7 +591,9 @@ static void getParentDir(const char* path, char* buffer) {
 	}
 }
 
-static int applyMap(const char* path, Array* entries) {
+static int applyMapEntries(const char* path, Array* mapped_entries) {
+	if (mapped_entries->count == 0) return 0;
+
 	char map_path[256];
 	map_path[0] = '\0';
 	concat(map_path, path, 256);
@@ -594,42 +603,10 @@ static int applyMap(const char* path, Array* entries) {
 	if (!file) return 0;
 
 	/*
-	 * Build a temporary list containing only entries that physically belong
-	 * to the directory owning this map.txt.
-	 *
-	 * Sorting pointers by real filename lets each map lookup use a binary
-	 * search instead of scanning every Entry for every line in map.txt.
-	 *
-	 * The original entries array is untouched, so display ordering and
-	 * collection ordering remain unchanged.
+	 * Work only on pointers in this source directory.
+	 * Sorting this temporary/view array does not change the ordering of the
+	 * original collection.
 	 */
-	Array* mapped_entries = Array_new();
-	size_t path_len = strlen(path);
-
-	for (int i=0; i<entries->count; i++) {
-		Entry* entry = entries->items[i];
-
-		char* slash = strrchr(entry->path, '/');
-		if (!slash) continue;
-
-		size_t dir_len = slash - entry->path;
-
-		if (
-			path_len != dir_len ||
-			strncmp(entry->path, path, dir_len) != 0
-		) {
-			continue;
-		}
-
-		Array_push(mapped_entries, entry);
-	}
-
-	if (mapped_entries->count == 0) {
-		Array_free(mapped_entries);
-		fclose(file);
-		return 0;
-	}
-
 	qsort(
 		mapped_entries->items,
 		mapped_entries->count,
@@ -704,8 +681,41 @@ static int applyMap(const char* path, Array* entries) {
 		}
 	}
 
-	Array_free(mapped_entries);
 	fclose(file);
+
+	return filter;
+}
+
+static int applyMap(const char* path, Array* entries) {
+	/*
+	 * General-purpose path used by the normal ROM/system menus.
+	 * Build a temporary list containing only entries physically belonging
+	 * to the directory owning this map.txt.
+	 */
+	Array* mapped_entries = Array_new();
+	size_t path_len = strlen(path);
+
+	for (int i=0; i<entries->count; i++) {
+		Entry* entry = entries->items[i];
+
+		char* slash = strrchr(entry->path, '/');
+		if (!slash) continue;
+
+		size_t dir_len = slash - entry->path;
+
+		if (
+			path_len != dir_len ||
+			strncmp(entry->path, path, dir_len) != 0
+		) {
+			continue;
+		}
+
+		Array_push(mapped_entries, entry);
+	}
+
+	int filter = applyMapEntries(path, mapped_entries);
+
+	Array_free(mapped_entries);
 
 	return filter;
 }
@@ -732,30 +742,72 @@ static Array* filterHiddenEntries(Array* entries) {
 
 static Array* applySourceMaps(Array* entries) {
 	int filter = 0;
-	Array* processed_dirs = Array_new();
+	Array* source_entries = Array_new();
 
+	/*
+	 * Collections / Recents may mix several systems.
+	 *
+	 * Collect ROM entries once, then sort only this temporary pointer array by
+	 * real path. Entries from the same source directory become contiguous.
+	 *
+	 * The original entries array remains untouched, so collection ordering is
+	 * preserved.
+	 */
 	for (int i=0; i<entries->count; i++) {
 		Entry* entry = entries->items[i];
 
-		// For now aliases come from ROM directories.
 		// Recently Played can also contain .pak games.
 		if (!match_prefix(kRomsDir, entry->path)) continue;
 
-		char dir[256];
-		getParentDir(entry->path, dir);
-
-		// A collection can contain many ROMs from the same system.
-		// Process each source directory only once.
-		if (StringArray_indexOf(processed_dirs, dir) >= 0) continue;
-
-		Array_push(processed_dirs, copy_string(dir));
-
-		if (applyMap(dir, entries)) {
-			filter = 1;
-		}
+		Array_push(source_entries, entry);
 	}
 
-	StringArray_free(processed_dirs);
+	qsort(
+		source_entries->items,
+		source_entries->count,
+		sizeof(void*),
+		EntryArray_sortPath
+	);
+
+	int start = 0;
+
+	while (start < source_entries->count) {
+		Entry* first = source_entries->items[start];
+
+		char dir[256];
+		getParentDir(first->path, dir);
+
+		int end = start + 1;
+
+		while (end < source_entries->count) {
+			Entry* entry = source_entries->items[end];
+			char entry_dir[256];
+
+			getParentDir(entry->path, entry_dir);
+
+			if (!exact_match(dir, entry_dir)) break;
+
+			end++;
+		}
+
+		/*
+		 * Lightweight view over this source directory's contiguous entries.
+		 * applyMapEntries() may reorder these pointers by filename, but the
+		 * original collection array is never modified.
+		 */
+		Array mapped_entries;
+		mapped_entries.count = end - start;
+		mapped_entries.capacity = mapped_entries.count;
+		mapped_entries.items = source_entries->items + start;
+
+		if (applyMapEntries(dir, &mapped_entries)) {
+			filter = 1;
+		}
+
+		start = end;
+	}
+
+	Array_free(source_entries);
 
 	if (filter) {
 		entries = filterHiddenEntries(entries);
@@ -813,10 +865,73 @@ static void appendSystemName(Entry* entry, const char* system) {
 	entry->name = display_name;
 }
 
+typedef struct SystemAlias {
+	char* system;
+	char* alias;
+	int order;
+} SystemAlias;
+
+static int SystemAliasArray_sortEntry(const void* a, const void* b) {
+	SystemAlias* item1 = *(SystemAlias**)a;
+	SystemAlias* item2 = *(SystemAlias**)b;
+
+	int cmp = strcmp(item1->system, item2->system);
+	if (cmp != 0) return cmp;
+
+	if (item1->order < item2->order) return -1;
+	if (item1->order > item2->order) return 1;
+	return 0;
+}
+
+static const char* SystemAliasArray_find(Array* aliases, const char* system) {
+	int low = 0;
+	int high = aliases->count - 1;
+
+	while (low <= high) {
+		int mid = low + (high - low) / 2;
+		SystemAlias* item = aliases->items[mid];
+		int cmp = strcmp(system, item->system);
+
+		if (cmp == 0) {
+			/*
+			 * Keep the first mapping from map.txt if a system appears
+			 * more than once, matching the previous behavior.
+			 */
+			while (mid > 0) {
+				SystemAlias* previous = aliases->items[mid - 1];
+
+				if (strcmp(system, previous->system) != 0) break;
+				mid--;
+			}
+
+			return ((SystemAlias*)aliases->items[mid])->alias;
+		}
+
+		if (cmp < 0) {
+			high = mid - 1;
+		}
+		else {
+			low = mid + 1;
+		}
+	}
+
+	return NULL;
+}
+
+static void SystemAliasArray_free(Array* aliases) {
+	for (int i=0; i<aliases->count; i++) {
+		SystemAlias* item = aliases->items[i];
+
+		free(item->system);
+		free(item->alias);
+		free(item);
+	}
+
+	Array_free(aliases);
+}
+
 static void appendSourceSystemNames(Array* entries) {
-	// Track which entries received an alias from /Roms/map.txt.
-	// Any remaining ROM entry will fall back to its physical system directory.
-	int* mapped = calloc(entries->count, sizeof(int));
+	Array* aliases = Array_new();
 
 	char map_path[256];
 	map_path[0] = '\0';
@@ -827,11 +942,11 @@ static void appendSourceSystemNames(Array* entries) {
 
 	if (file) {
 		char line[256];
+		int order = 0;
 
 		while (fgets(line, 256, file) != NULL) {
 			int len = strlen(line);
 
-			// Remove Unix or Windows line endings.
 			if (len > 0 && line[len - 1] == '\n') {
 				line[len - 1] = '\0';
 				len -= 1;
@@ -844,8 +959,6 @@ static void appendSourceSystemNames(Array* entries) {
 
 			if (len == 0) continue;
 
-			// Keep the same separators accepted by applyMap(): our preferred ';'
-			// plus tab compatibility with standard MinUI map.txt files.
 			char* separator = strchr(line, ';');
 			char* tab = strchr(line, '\t');
 
@@ -862,53 +975,52 @@ static void appendSourceSystemNames(Array* entries) {
 
 			if (physical_system[0] == '\0' || alias[0] == '\0') continue;
 
-			// A leading '.' remains the visibility marker used by /Roms/map.txt:
-			// applyMap() will still hide that system from the root systems list.
-			//
-			// Collections and Recently Played are mixed-system views, though, so the
-			// alias is still useful there as a label. Strip only the leading marker:
-			//
-			//   Neo Geo;.SNK Neo Geo
-			//
-			// root systems list      -> hidden
-			// Collections / Recents -> "Metal Slug (SNK Neo Geo)"
-			//
-			// If the alias is only ".", leave the entry unmapped so the fallback
-			// below uses the physical system directory instead of displaying "()".
+			/*
+			 * A leading '.' hides the system from the root menu, but the
+			 * remaining alias is still useful in Collections / Recents.
+			 */
 			if (alias[0] == '.') {
 				alias += 1;
 				if (alias[0] == '\0') continue;
 			}
 
-			for (int i=0; i<entries->count; i++) {
-				if (mapped[i]) continue;
+			SystemAlias* item = malloc(sizeof(SystemAlias));
+			item->system = copy_string(physical_system);
+			item->alias = copy_string(alias);
+			item->order = order++;
 
-				Entry* entry = entries->items[i];
-				char system[256];
-
-				if (!getEntrySystemName(entry, system, sizeof(system))) continue;
-				if (!exact_match(physical_system, system)) continue;
-
-				appendSystemName(entry, alias);
-				mapped[i] = 1;
-			}
+			Array_push(aliases, item);
 		}
 
 		fclose(file);
 	}
 
-	// No usable alias: use the real /Roms/<system> folder.
-	for (int i=0; i<entries->count; i++) {
-		if (mapped[i]) continue;
+	/*
+	 * Sort once, then each collection entry can resolve its system alias
+	 * with a binary search instead of scanning every line from /Roms/map.txt.
+	 */
+	qsort(
+		aliases->items,
+		aliases->count,
+		sizeof(void*),
+		SystemAliasArray_sortEntry
+	);
 
+	for (int i=0; i<entries->count; i++) {
 		Entry* entry = entries->items[i];
 		char system[256];
 
 		if (!getEntrySystemName(entry, system, sizeof(system))) continue;
-		appendSystemName(entry, system);
+
+		const char* alias = SystemAliasArray_find(aliases, system);
+
+		appendSystemName(
+			entry,
+			alias ? alias : system
+		);
 	}
 
-	free(mapped);
+	SystemAliasArray_free(aliases);
 }
 
 static Array* getRecents(void) {
