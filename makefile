@@ -41,8 +41,8 @@ all: readme sys emus tools zip
 #--------------------------------------
 
 lib:
-	cd ./src/libmsettings && make
-	cd ./src/libmmenu && make
+	$(MAKE) -C src/libmsettings
+	$(MAKE) -C src/libmmenu
 
 readme:
 	mkdir -p "$(BUILD_PATH)"
@@ -56,13 +56,13 @@ sys: lib
 	mkdir -p "$(PAYLOAD_PATH)/System/lib"
 	echo "$(RELEASE_NAME)" > "$(PAYLOAD_PATH)/System/version.txt"
 	cd ./third-party/SDL-1.2 && ./make.sh
-	cd ./TrimuiUpdate/ && make
+	$(MAKE) -C TrimuiUpdate
 	cp -R ./TrimuiUpdate/installer/. "$(PAYLOAD_PATH)"
-	cd ./src/keymon && make
-	cd ./src/MinUI && make
-	cd ./src/show && make
-	cd ./src/confirm && make
-	cd ./src/flipbook && make
+	$(MAKE) -C src/keymon
+	$(MAKE) -C src/MinUI
+	$(MAKE) -C src/show
+	$(MAKE) -C src/confirm
+	$(MAKE) -C src/flipbook
 	cp -R "paks/System.pak" 			"$(PAYLOAD_PATH)/System"
 	cp -R "paks/Update.pak" 			"$(PAYLOAD_PATH)/System"
 	cp "src/MinUI/MinUI" 				"$(PAYLOAD_PATH)/System/System.pak"
@@ -128,7 +128,7 @@ snes: emu
 
 ps: emu
 	mkdir -p "$(ROMS_PATH)/PS"
-	if [ ! -f ./third-party/pcsx_rearmed/config.mak ]; then cd ./third-party/pcsx_rearmed && CROSS_COMPILE=/opt/trimui-toolchain/bin/arm-buildroot-linux-gnueabi- ./configure --platform=trimui; fi
+	if [ ! -f ./third-party/pcsx_rearmed/config.mak ]; then cd ./third-party/pcsx_rearmed && CROSS_COMPILE="$(CROSS_COMPILE)" ./configure --platform=trimui; fi
 	cd ./third-party/pcsx_rearmed && $(MAKE) -j$(JOBS)
 	cp -R "paks/PS.pak" "$(PAYLOAD_PATH)/Emus"
 	cp "third-party/pcsx_rearmed/pcsx" "$(PAYLOAD_PATH)/Emus/PS.pak"
@@ -152,7 +152,7 @@ gen: emu
 	mkdir -p "$(ROMS_PATH)/MD"
 	mkdir -p "$(ROMS_PATH)/SCD"
 	mkdir -p "$(ROMS_PATH)/32X"
-	if [ ! -f ./third-party/picodrive/config.mak ]; then cd ./third-party/picodrive && CROSS_COMPILE=/opt/trimui-toolchain/bin/arm-buildroot-linux-gnueabi- ./configure --platform=trimui; fi
+	if [ ! -f ./third-party/picodrive/config.mak ]; then cd ./third-party/picodrive && CROSS_COMPILE="$(CROSS_COMPILE)" ./configure --platform=trimui; fi
 	cd ./third-party/picodrive && $(MAKE) -j$(JOBS)
 	cp -R "paks/MD.pak" "$(PAYLOAD_PATH)/Emus"
 	cp -R "paks/SCD.pak" "$(PAYLOAD_PATH)/Emus"
@@ -279,7 +279,7 @@ tips: tool
 	cp -R "paks/Tips.pak" "$(PAYLOAD_PATH)/Tools"
 
 clock: tool
-	cd ./src/clock && make
+	$(MAKE) -C src/clock
 	cp -R "paks/Clock.pak" "$(PAYLOAD_PATH)/Tools"
 	cp "src/clock/clock" "$(PAYLOAD_PATH)/Tools/Clock.pak"
 
@@ -548,12 +548,12 @@ picoarch-clean-payload:
 
 
 clean-sys:
-	cd ./src/libmmenu && make clean
-	cd ./src/MinUI && make clean
-	cd ./src/show && make clean
-	cd ./src/confirm && make clean
-	cd ./src/flipbook && make clean
-	cd ./TrimuiUpdate/ && make clean
+	$(MAKE) -C src/libmmenu clean
+	$(MAKE) -C src/MinUI clean
+	$(MAKE) -C src/show clean
+	$(MAKE) -C src/confirm clean
+	$(MAKE) -C src/flipbook clean
+	$(MAKE) -C TrimuiUpdate clean
 
 clean: clean-sys
 	cd ./third-party/SDL-1.2 && make distclean
