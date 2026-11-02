@@ -64,7 +64,8 @@ static int match_prefix(char* pre, char* str) {
 }
 static int match_suffix(char* suf, char* str) {
 	int len = strlen(suf);
-	return (strncasecmp(suf, str+strlen(str)-len, len)==0);
+	int str_len = strlen(str);
+	return str_len >= len && strncasecmp(suf, str+str_len-len, len)==0;
 }
 // NOTE: this is still case-sensitive
 static int exact_match(char* str1, char* str2) {
@@ -430,28 +431,34 @@ static int hasRecents(void) {
 	return has;
 }
 static int hasPaks(char* path) {
-	int has = 0;
-
 	DIR *dh = opendir(path);
-	if (dh!=NULL) {
-		struct dirent *dp;
-		while((dp = readdir(dh)) != NULL) {
-			int is_dir = dp->d_type==DT_DIR;
-			if (is_dir && match_suffix(".pak", dp->d_name)) {
-				char pak[256];
-				pak[0] = '\0';
-				concat(pak, path, 256);
-				concat(pak, "/", 256);
-				concat(pak, dp->d_name, 256);
-				concat(pak, "/launch.sh", 256);
-				if (exists(pak)) {
-					has = 1;
-					break;
-				}
+	if (dh == NULL) return 0;
+
+	int has = 0;
+	struct dirent *dp;
+
+	while ((dp = readdir(dh)) != NULL) {
+		if (hide(dp->d_name) || dp->d_type != DT_DIR) continue;
+
+		char entry[256];
+		int len = snprintf(entry, sizeof(entry), "%s/%s", path, dp->d_name);
+		if (len < 0 || len >= (int)sizeof(entry)) continue;
+
+		if (match_suffix(".pak", dp->d_name)) {
+			char launch[256];
+			len = snprintf(launch, sizeof(launch), "%s/launch.sh", entry);
+			if (len >= 0 && len < (int)sizeof(launch) && exists(launch)) {
+				has = 1;
+				break;
 			}
 		}
-		closedir(dh);
+		else if (hasPaks(entry)) {
+			has = 1;
+			break;
+		}
 	}
+
+	closedir(dh);
 	return has;
 }
 
