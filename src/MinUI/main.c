@@ -27,6 +27,8 @@
 #define kCollectionsDir kRootDir "/Collections"
 #define kResDir kRootDir "/System/res/"
 #define kRecentlyPlayedDir kRootDir "/Recently Played"
+#define kFavoritesDir kRootDir "/Favorites"
+#define kFavoritesPath kRootDir "/.minui/favorites.txt"
 #define kLastPath "/tmp/last.txt"
 #define kChangeDiscPath "/tmp/change_disc.txt"
 #define kResumeSlotPath "/tmp/mmenu_slot.txt"
@@ -336,6 +338,7 @@ static int StringArray_indexOf(Array* self, char* str) {
 
 #define kMaxRecents 40
 Array* recents;
+Array* favorites;
 static void saveRecents(void) {
 	FILE* file = fopen(kRootDir "/.minui/recent.txt", "w");
 	if (file) {
@@ -363,6 +366,100 @@ static void addRecent(char* path) {
 	}
 	saveRecents();
 }
+// Favorites store ROM paths relative to the SD card, like Collections.
+// Missing ROMs remain in the file, but are not shown in the menu.
+static void loadFavorites(void) {
+    favorites = Array_new();
+    FILE* file = fopen(kFavoritesPath, "r");
+    if (!file) return;
+
+    char line[256];
+    while (fgets(line, sizeof(line), file)) {
+        size_t len = strlen(line);
+        while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r')) {
+            line[--len] = '\0';
+        }
+        if (!match_prefix("/Roms/", line)) continue;
+
+        char path[256];
+        int written = snprintf(path, sizeof(path), "%s%s", kRootDir, line);
+        if (written < 0 || written >= (int)sizeof(path)) continue;
+        if (StringArray_indexOf(favorites, path) == -1) {
+            Array_push(favorites, copy_string(path));
+        }
+    }
+    fclose(file);
+}
+
+static int saveFavorites(void) {
+    FILE* file = fopen(kFavoritesPath ".tmp", "w");
+    if (!file) return 0;
+
+    for (int i=0; i<favorites->count; i++) {
+        char* path = favorites->items[i];
+        if (fprintf(file, "%s\n", path + strlen(kRootDir)) < 0) {
+            fclose(file);
+            unlink(kFavoritesPath ".tmp");
+            return 0;
+        }
+    }
+    if (fclose(file) != 0 || rename(kFavoritesPath ".tmp", kFavoritesPath) != 0) {
+        unlink(kFavoritesPath ".tmp");
+        return 0;
+    }
+    return 1;
+}
+
+static int hasFavorites(void) {
+    for (int i=0; i<favorites->count; i++) {
+        if (exists(favorites->items[i])) return 1;
+    }
+    return 0;
+}
+
+// Return 1 if added, 0 if already present, -1 on a write error.
+static int addFavorite(char* path) {
+    if (StringArray_indexOf(favorites, path) >= 0) return 0;
+    Array_push(favorites, copy_string(path));
+    if (saveFavorites()) return 1;
+    free(Array_pop(favorites));
+    return -1;
+}
+
+static int removeFavorite(char* path) {
+    int index = StringArray_indexOf(favorites, path);
+    if (index < 0) return 0;
+
+    char* removed = favorites->items[index];
+    for (int i=index; i<favorites->count-1; i++) {
+        favorites->items[i] = favorites->items[i+1];
+    }
+    favorites->count--;
+    if (saveFavorites()) {
+        free(removed);
+        return 1;
+    }
+
+    // Keep the in-memory list unchanged if the SD card is not writable.
+    for (int i=favorites->count; i>index; i--) {
+        favorites->items[i] = favorites->items[i-1];
+    }
+    favorites->items[index] = removed;
+    favorites->count++;
+    return 0;
+}
+
+// The virtual Favorites resume path identifies a ROM by its real path,
+// avoiding ambiguity when two systems have ROMs with identical filenames.
+static unsigned int favoritePathHash(const char* path) {
+    unsigned int hash = 2166136261u;
+    while (*path) {
+        hash ^= (unsigned char)*path++;
+        hash *= 16777619u;
+    }
+    return hash;
+}
+
 static int hasRecents(void) {
 	int has = 0;
 	
@@ -1053,6 +1150,20 @@ static Array* getRecents(void) {
 	return entries;
 }
 
+static Array* getFavorites(void) {
+    Array* entries = Array_new();
+    for (int i=0; i<favorites->count; i++) {
+        char* path = favorites->items[i];
+        if (!exists(path)) continue;
+        Array_push(entries, Entry_new(path, kEntryRom));
+    }
+
+    // Reuse the exact same alias and system-name rules as Collections.
+    entries = applySourceMaps(entries);
+    appendSourceSystemNames(entries);
+    return entries;
+}
+
 static Array* getCollection(char* path) {
     Array* entries = Array_new();
 
@@ -1189,12 +1300,13 @@ static int has_roms = 0;
 static Array* getRoot(void) {
 	Array* entries = Array_new();
 
-	int has_recents = hasRecents();
+	int has_recents = recents->count > 0; // Loaded once in Menu_init().
 	int has_games = hasPaks(kRootDir "/Games");
 	int has_tools = hasPaks(kRootDir "/Tools");
 	int has_update = hasUpdate();
 	
 	if (has_recents) Array_push(entries, Entry_new(kRecentlyPlayedDir, kEntryDir));
+	if (hasFavorites()) Array_push(entries, Entry_new(kFavoritesDir, kEntryDir));
 	
 	char* path = kRootDir "/Roms";
 
@@ -1416,7 +1528,8 @@ typedef struct Directory {
 static void Directory_index(Directory* self) {
     // Collection contents keep the explicit order from the .txt file,
     // so alphabetical navigation does not apply to them.
-    int skip_index = match_prefix(kCollectionsDir "/", self->path);
+    int skip_index = match_prefix(kCollectionsDir "/", self->path) ||
+        exact_match(self->path, kFavoritesDir);
 
     Entry* prior = NULL;
     int alpha = -1;
@@ -1454,6 +1567,9 @@ static Directory* Directory_new(char* path, int selected) {
 	}
 	else if (exact_match(path, kRecentlyPlayedDir)) {
 		self->entries = getRecents();
+	}
+	else if (exact_match(path, kFavoritesDir)) {
+		self->entries = getFavorites();
 	}
 	else if (match_prefix(kCollectionsDir "/", path) &&
 		match_suffix(".txt", path)
@@ -1811,6 +1927,42 @@ static void togglePreviews(void) {
 }
 
 #define kMaxRows 5
+
+// Refresh the cached root after the favorites menu gains or loses an entry.
+// Keep its selection, and do not reload Recently Played a second time.
+static int favorites_root_dirty = 0;
+
+static void refreshRoot(void) {
+    Directory* old = stack->items[0];
+    Directory* updated = Directory_new(kRootDir, 0);
+
+    if (old->entries->count > 0 && updated->entries->count > 0) {
+        Entry* old_entry = old->entries->items[old->selected];
+        int index = EntryArray_indexOf(updated->entries, old_entry->path);
+        if (index < 0) {
+            index = old->selected;
+            if (index >= updated->entries->count) index = updated->entries->count-1;
+        }
+        updated->selected = index;
+    }
+
+    int count = updated->entries->count;
+    updated->start = old->start;
+    if (count <= kMaxRows) updated->start = 0;
+    else if (updated->start > count-kMaxRows) updated->start = count-kMaxRows;
+    if (updated->selected < updated->start) updated->start = updated->selected;
+    if (updated->selected >= updated->start+kMaxRows) {
+        updated->start = updated->selected-kMaxRows+1;
+    }
+    updated->end = updated->start+kMaxRows;
+    if (updated->end > count) updated->end = count;
+
+    stack->items[0] = updated;
+    if (top == old) top = updated;
+    Directory_free(old);
+    favorites_root_dirty = 0;
+}
+
 
 ///////////////////////////////////////
 
@@ -2308,10 +2460,13 @@ static void Entry_open(Entry* self) {
 		//   /Collections/Shmups.txt/donpachi.zip
 		//
 		// The real ROM path is still passed unchanged to open_rom().
-		if (
-			match_prefix(kCollectionsDir "/", top->path) &&
-			match_suffix(".txt", top->path)
-		) {
+		if (exact_match(top->path, kFavoritesDir)) {
+			snprintf(last_path, sizeof(last_path), "%s/%08x",
+				kFavoritesDir, favoritePathHash(self->path));
+			last = last_path;
+		}
+		else if (match_prefix(kCollectionsDir "/", top->path) &&
+			match_suffix(".txt", top->path)) {
 			char* filename = strrchr(self->path, '/');
 
 			if (filename != NULL) {
@@ -2344,11 +2499,12 @@ static void loadLast(void) { // call after loading root directory
 
 	// Keep this information before last_path is progressively truncated below.
 	int is_collection = match_prefix(kCollectionsDir "/", last_path);
+	int is_favorite = match_prefix(kFavoritesDir "/", last_path);
 
 	char filename[256];
 	filename[0] = '\0';
 
-	if (is_collection) {
+	if (is_collection || is_favorite) {
 		char* tmp = strrchr(last_path, '/');
 
 		if (tmp != NULL) {
@@ -2382,7 +2538,10 @@ static void loadLast(void) { // call after loading root directory
 				filename[0] != '\0' &&
 				match_suffix(filename, entry->path);
 
-			if (matches_path || matches_collection_rom) {
+			int matches_favorite_rom =
+				is_favorite && last->count == 0 && filename[0] != '\0' &&
+				strtoul(filename+1, NULL, 16) == favoritePathHash(entry->path);
+			if (matches_path || matches_collection_rom || matches_favorite_rom) {
 				top->selected = i;
 				if (i>=top->end) {
 					top->start = i;
@@ -2405,14 +2564,61 @@ static void loadLast(void) { // call after loading root directory
 	StringArray_free(last);
 }
 
+// Rebuild the currently open Favorites list after removal, keeping the cursor.
+static void refreshFavoritesDirectory(void) {
+    Directory* old = top;
+    Directory* updated = Directory_new(kFavoritesDir, 0);
+    int count = updated->entries->count;
+    if (count == 0) {
+        Directory_free(updated);
+        close_directory();
+        refreshRoot();
+        return;
+    }
+
+    updated->selected = old->selected;
+    if (updated->selected >= count) updated->selected = count-1;
+    updated->start = old->start;
+    if (count <= kMaxRows) updated->start = 0;
+    else if (updated->start > count-kMaxRows) updated->start = count-kMaxRows;
+    if (updated->selected < updated->start) updated->start = updated->selected;
+    updated->end = updated->start + kMaxRows;
+    if (updated->end > count) updated->end = count;
+
+    stack->items[stack->count-1] = updated;
+    top = updated;
+    Directory_free(old);
+}
+
+// Use the same black rounded background as the volume/brightness overlay.
+// The asset is 146x26 and is loaded once at MinUI startup.
+static void drawFavoriteNotice(SDL_Surface* surface, TTF_Font* font,
+                               SDL_Surface* background, char* message) {
+    if (!message || !background) return;
+
+    SDL_Surface* label = TTF_RenderUTF8_Blended(font, message, (SDL_Color){0xff,0xff,0xff});
+    if (!label) return;
+
+    SDL_Rect box = {(320-background->w)/2, 7, 0, 0};
+    SDL_BlitSurface(background, NULL, surface, &box);
+    SDL_BlitSurface(label, NULL, surface, &(SDL_Rect){
+        box.x + (background->w-label->w)/2,
+        box.y + (background->h-label->h)/2, 0, 0
+    });
+    SDL_FreeSurface(label);
+}
+
 static void Menu_init(void) {
 	stack = Array_new(); // array of open Directories
 	recents = Array_new();
+	loadFavorites();
+	hasRecents();
 	
 	open_directory(kRootDir, 0);
 	loadLast(); // restore state when available
 }
 static void Menu_quit(void) {
+	StringArray_free(favorites);
 	StringArray_free(recents);
 	DirectoryArray_free(stack);
 }
@@ -2547,6 +2753,7 @@ int main(void) {
 
 	SDL_Surface* ui_settings_bar_empty	= IMG_Load(kResDir "settings-bar-empty.png");
 	SDL_Surface* ui_settings_bar_full	= IMG_Load(kResDir "settings-bar-full.png");
+	SDL_Surface* ui_favorite_notice_bg = IMG_Load(kResDir "settings-bg.png");
 	SDL_Surface* ui_brightness_icon		= IMG_Load(kResDir "settings-icon-brightness.png");
 	SDL_Surface* ui_volume_icon			= IMG_Load(kResDir "settings-icon-volume.png");
 	SDL_Surface* ui_mute_icon			= IMG_Load(kResDir "settings-icon-volume-mute.png");
@@ -2595,6 +2802,8 @@ int main(void) {
 	// +1 moves the visible window towards the end of the text (text moves left).
 	// -1 moves it back towards the beginning, creating a ping-pong/bounce effect.
 	int scroll_direction = 1;
+	char* favorite_notice = NULL;
+	unsigned long favorite_notice_until = 0;
 	int disable_sleep = exists("/tmp/disable-sleep");
 	unsigned long cancel_start = SDL_GetTicks();
 	unsigned long wait_start = SDL_GetTicks();
@@ -2633,13 +2842,16 @@ int main(void) {
 		}
 		
 		
-		if (enable_screenshots && Input_justPressed(kButtonY)) save_screenshot(NULL);
-		
 		int selected = top->selected;
 		int total = top->entries->count;
 
 		if (Input_justPressed(kButtonStart)) {
 			start_used = 0;
+		}
+		// Y is reserved for Favorites; Start+Y keeps launcher screenshots.
+		if (Input_isPressed(kButtonStart) && Input_justPressed(kButtonY)) {
+			start_used = 1;
+			if (enable_screenshots) save_screenshot(NULL);
 		}
 
 		if (Input_isPressed(kButtonStart) && Input_justPressed(kButtonUp)) {
@@ -2655,7 +2867,7 @@ int main(void) {
 			is_dirty = 1;
 		}
 
-		if (!Input_isPressed(kButtonSelect)) {
+		if (total > 0 && !Input_isPressed(kButtonSelect)) {
 			if (!Input_isPressed(kButtonStart) && Input_justRepeated(kButtonUp)) {
 				selected -= 1;
 				if (selected<0) {
@@ -2709,10 +2921,10 @@ int main(void) {
 				}
 			}
 		}
-		if (!Input_isPressed(kButtonStart) && !Input_isPressed(kButtonSelect)) {
-			int is_collection =
-				match_prefix(kCollectionsDir "/", top->path) &&
-				match_suffix(".txt", top->path);
+		if (total > 0 && !Input_isPressed(kButtonStart) && !Input_isPressed(kButtonSelect)) {
+			int is_collection = exact_match(top->path, kFavoritesDir) ||
+				(match_prefix(kCollectionsDir "/", top->path) &&
+				match_suffix(".txt", top->path));
 
 			if (Input_justRepeated(kButtonL)) {
 				if (is_collection) { // previous page
@@ -2790,7 +3002,36 @@ int main(void) {
 			is_dirty = 1;
 		}
 		
-		if (is_dirty) {
+		// Favorites are changed only from ROM lists, Recents and Collections.
+        // Within Favorites, Y always removes rather than toggling elsewhere.
+        if (Input_justPressed(kButtonY) && !Input_isPressed(kButtonStart) &&
+            !Input_isPressed(kButtonSelect) && top->entries->count > 0) {
+            Entry* entry = top->entries->items[top->selected];
+            if (entry->type == kEntryRom && match_prefix(kRomsDir, entry->path)) {
+                if (exact_match(top->path, kFavoritesDir)) {
+                    if (removeFavorite(entry->path)) {
+                        favorite_notice = "Favorite removed";
+                        favorites_root_dirty = 1;
+                        refreshFavoritesDirectory();
+                    }
+                    else favorite_notice = "Could not save";
+                }
+                else {
+                    int result = addFavorite(entry->path);
+                    if (result == 1) {
+                        favorite_notice = "Favorite added";
+                        favorites_root_dirty = 1;
+                    }
+                    else if (result == 0) favorite_notice = "Already a favorite";
+                    else favorite_notice = "Could not save";
+                }
+                favorite_notice_until = SDL_GetTicks()+1500;
+                is_dirty = 1;
+            }
+        }
+        total = top->entries->count;
+
+		if (is_dirty && total > 0) {
 			ready_resume(top->entries->items[top->selected]);
 			
 			// Entry* entry = top->entries->items[top->selected];
@@ -2798,12 +3039,12 @@ int main(void) {
 			// else can_resume = 0;
 		}
 		
-		if (can_resume && Input_justPressed(kButtonX)) {
+		if (total > 0 && can_resume && Input_justPressed(kButtonX)) {
 			should_resume = 1;
 			Entry_open(top->entries->items[top->selected]);
 			is_dirty = 1;
 		}
-		else if (Input_justPressed(kButtonA)) {
+		else if (total > 0 && Input_justPressed(kButtonA)) {
 			Entry_open(top->entries->items[top->selected]);
 			is_dirty = 1;
 			
@@ -2811,11 +3052,16 @@ int main(void) {
 		}
 		else if (Input_justPressed(kButtonB) && stack->count>1) {
 			close_directory();
+			if (exact_match(top->path, kRootDir) && favorites_root_dirty) refreshRoot();
 			is_dirty = 1;
 			can_resume = 0;
 		}
 		
 		unsigned long now = SDL_GetTicks();
+		if (favorite_notice && now >= favorite_notice_until) {
+			favorite_notice = NULL;
+			is_dirty = 1;
+		}
 
 		// Preview loading has its own 0.3 second selection-stability timer. This
 		// check runs every frame because the delay can expire while there is no new
@@ -2979,6 +3225,21 @@ int main(void) {
 				}
 			}
 			
+			// The center of the footer is free between Resume and Back.
+            if (top->entries->count > 0) {
+                Entry* entry = top->entries->items[top->selected];
+                if (entry->type == kEntryRom && match_prefix(kRomsDir, entry->path)) {
+                    SDL_BlitSurface(ui_round_button, NULL, screen, &(SDL_Rect){106,210,0,0});
+                    text = TTF_RenderUTF8_Blended(font, "Y", (SDL_Color){0x9f,0x89,0x52});
+                    SDL_BlitSurface(text, NULL, screen, &(SDL_Rect){112,211,0,0});
+                    SDL_FreeSurface(text);
+                    char* label = exact_match(top->path, kFavoritesDir) ? "DEL" : "FAV";
+                    text = TTF_RenderUTF8_Blended(tiny, label, (SDL_Color){0xff,0xff,0xff});
+                    SDL_BlitSurface(text, NULL, screen, &(SDL_Rect){132,212,0,0});
+                    SDL_FreeSurface(text);
+                }
+            }
+
 			int y = 0;
 			for (int i=top->start; i<top->end; i++) {
 				Entry* entry = top->entries->items[i];
@@ -3018,6 +3279,7 @@ int main(void) {
 			// Foreground preview: render it only after every MinUI element so the
 			// image always stays visually above the menu, text and status bars.
 			drawPreview();
+			drawFavoriteNotice(screen, tiny, ui_favorite_notice_bg, favorite_notice);
 			
 			SDL_Flip(screen);
 			is_dirty = 0;
@@ -3068,6 +3330,7 @@ int main(void) {
 				// preview afterwards to keep it in the foreground. This is only a blit;
 				// the expensive PNG load/scale happened once in updatePreview().
 				drawPreview();
+				drawFavoriteNotice(screen, tiny, ui_favorite_notice_bg, favorite_notice);
 				SDL_Flip(screen); // TODO: just update the modified rect?
 			}
 			else {
@@ -3117,6 +3380,7 @@ int main(void) {
 	
 	SDL_FreeSurface(ui_settings_bar_empty);
 	SDL_FreeSurface(ui_settings_bar_full);
+	SDL_FreeSurface(ui_favorite_notice_bg);
 	SDL_FreeSurface(ui_brightness_icon);
 	SDL_FreeSurface(ui_volume_icon);
 	SDL_FreeSurface(ui_mute_icon);
