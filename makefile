@@ -230,7 +230,7 @@ gngeo: lib emu
 	fi
 
 #--------------------------------------
-tools: bridge commander od-commander reload stock tips clock gmenunx # zero
+tools: bridge commander od-commander reload stock tips clock random-game gmenunx # zero
 #--------------------------------------
 
 tool:
@@ -282,6 +282,14 @@ clock: tool
 	$(MAKE) -C src/clock
 	cp -R "paks/Clock.pak" "$(PAYLOAD_PATH)/Tools"
 	cp "src/clock/clock" "$(PAYLOAD_PATH)/Tools/Clock.pak"
+
+random-game: tool
+	mkdir -p "$(BUILD_PATH)"
+	$(CROSS_COMPILE)gcc -O2 -s -Wall -Wextra \
+		-o "$(BUILD_PATH)/random-game-status" \
+		"src/random-game-status/main.c" -lSDL -lSDL_ttf
+	cp -R "paks/Random Game.pak" "$(PAYLOAD_PATH)/Tools"
+	cp "$(BUILD_PATH)/random-game-status" "$(PAYLOAD_PATH)/Tools/Random Game.pak/status"
 
 .PHONY: gmenunx
 gmenunx: tool
