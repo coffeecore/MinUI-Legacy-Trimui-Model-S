@@ -19,7 +19,7 @@
 
 # MinUI Legacy for Trimui Model S
 
-![MinUI main menu](github/minui.png) ![MinUI in-emulator menu](github/libmmenu-sonic.png)
+![](github/minui.png) ![](github/libmmenu-mslug4.png)  ![](github/minui-collections-list.png) ![](github/minui-collections.png) ![](github/minui-preview.png)
 
 ## Original key features
 
